@@ -70,6 +70,7 @@ Blank means not implemented.
 
 - [ ] Reflection
 - [ ] Interfaces
+	- [x] #1
 - [ ] Type merging
 - [ ] Type generation
 
