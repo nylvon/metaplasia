@@ -5,8 +5,9 @@
 /// Each test name is formatted as follows:
 /// "[FeatureName] [Scenario]"
 pub const MetaplasiaTests = @This();
-pub const Metaplasia = @import("metaplasia.zig");
-const LookupError = Metaplasia.LookupError;
+const Metaplasia = @import("metaplasia.zig");
+const Common = Metaplasia.Common;
+const LookupError = Common.LookupError;
 const std = @import("std");
 const testing = std.testing;
 const expect = testing.expect;
@@ -23,31 +24,31 @@ test "FindInType Struct" {
 
     // Try to find the field
     // First two should not error, the third should error
-    const field_type = try Metaplasia.FindInType(sample_type, "a", .Field);
+    const field_type = try Common.FindInType(sample_type, "a", .Field);
     try expect(field_type == i32);
-    const field_type_any = try Metaplasia.FindInType(sample_type, "a", .Any);
+    const field_type_any = try Common.FindInType(sample_type, "a", .Any);
     try expect(field_type_any == i32);
-    const field_error = Metaplasia.FindInType(sample_type, "a", .Declaration);
+    const field_error = Common.FindInType(sample_type, "a", .Declaration);
     try expectError(LookupError.NotFound, field_error);
 
     // Try to find the declaration
     // First two should not error, the third should error
-    const decl_type = try Metaplasia.FindInType(sample_type, "b", .Declaration);
+    const decl_type = try Common.FindInType(sample_type, "b", .Declaration);
     try expect(decl_type == i64);
-    const decl_type_any = try Metaplasia.FindInType(sample_type, "b", .Any);
+    const decl_type_any = try Common.FindInType(sample_type, "b", .Any);
     try expect(decl_type_any == i64);
-    const decl_error = Metaplasia.FindInType(sample_type, "b", .Field);
+    const decl_error = Common.FindInType(sample_type, "b", .Field);
     try expectError(LookupError.NotFound, decl_error);
 }
 
 test "FindInType Struct Empty" {
     const sample_type = struct {};
 
-    const field_error = Metaplasia.FindInType(sample_type, "a", .Field);
+    const field_error = Common.FindInType(sample_type, "a", .Field);
     try expectError(LookupError.TypeHasNoFields, field_error);
-    const decl_error = Metaplasia.FindInType(sample_type, "a", .Declaration);
+    const decl_error = Common.FindInType(sample_type, "a", .Declaration);
     try expectError(LookupError.TypeHasNoDeclarations, decl_error);
-    const any_error = Metaplasia.FindInType(sample_type, "a", .Any);
+    const any_error = Common.FindInType(sample_type, "a", .Any);
     try expectError(LookupError.TypeHasNoFieldsOrDeclarations, any_error);
 }
 
@@ -59,31 +60,31 @@ test "FindInType Union" {
 
     // Try to find the field
     // First two should not error, the third should error
-    const field_type = try Metaplasia.FindInType(sample_type, "a", .Field);
+    const field_type = try Common.FindInType(sample_type, "a", .Field);
     try expect(field_type == i32);
-    const field_type_any = try Metaplasia.FindInType(sample_type, "a", .Any);
+    const field_type_any = try Common.FindInType(sample_type, "a", .Any);
     try expect(field_type_any == i32);
-    const field_error = Metaplasia.FindInType(sample_type, "a", .Declaration);
+    const field_error = Common.FindInType(sample_type, "a", .Declaration);
     try expectError(LookupError.NotFound, field_error);
 
     // Try to find the declaration
     // First two should not error, the third should error
-    const decl_type = try Metaplasia.FindInType(sample_type, "b", .Declaration);
+    const decl_type = try Common.FindInType(sample_type, "b", .Declaration);
     try expect(decl_type == i64);
-    const decl_type_any = try Metaplasia.FindInType(sample_type, "b", .Any);
+    const decl_type_any = try Common.FindInType(sample_type, "b", .Any);
     try expect(decl_type_any == i64);
-    const decl_error = Metaplasia.FindInType(sample_type, "b", .Field);
+    const decl_error = Common.FindInType(sample_type, "b", .Field);
     try expectError(LookupError.NotFound, decl_error);
 }
 
 test "FindInType Union Empty" {
     const sample_type = union {};
 
-    const field_error = Metaplasia.FindInType(sample_type, "a", .Field);
+    const field_error = Common.FindInType(sample_type, "a", .Field);
     try expectError(LookupError.TypeHasNoFields, field_error);
-    const decl_error = Metaplasia.FindInType(sample_type, "a", .Declaration);
+    const decl_error = Common.FindInType(sample_type, "a", .Declaration);
     try expectError(LookupError.TypeHasNoDeclarations, decl_error);
-    const any_error = Metaplasia.FindInType(sample_type, "a", .Any);
+    const any_error = Common.FindInType(sample_type, "a", .Any);
     try expectError(LookupError.TypeHasNoFieldsOrDeclarations, any_error);
 }
 
@@ -95,20 +96,20 @@ test "FindInType Enum" {
 
     // Try to find the field
     // First two should not error, the third should error
-    const field_type = try Metaplasia.FindInType(sample_type, "a", .Field);
+    const field_type = try Common.FindInType(sample_type, "a", .Field);
     try expect(field_type == sample_type.a);
-    const field_type_any = try Metaplasia.FindInType(sample_type, "a", .Any);
+    const field_type_any = try Common.FindInType(sample_type, "a", .Any);
     try expect(field_type_any.field == sample_type.a);
-    const field_error = Metaplasia.FindInType(sample_type, "a", .Declaration);
+    const field_error = Common.FindInType(sample_type, "a", .Declaration);
     try expectError(LookupError.NotFound, field_error);
 
     // Try to find the declaration
     // First two should not error, the third should error
-    const decl_type = try Metaplasia.FindInType(sample_type, "b", .Declaration);
+    const decl_type = try Common.FindInType(sample_type, "b", .Declaration);
     try expect(decl_type == i64);
-    const decl_type_any = try Metaplasia.FindInType(sample_type, "b", .Any);
+    const decl_type_any = try Common.FindInType(sample_type, "b", .Any);
     try expect(decl_type_any.decl == i64);
-    const decl_error = Metaplasia.FindInType(sample_type, "b", .Field);
+    const decl_error = Common.FindInType(sample_type, "b", .Field);
     try expectError(LookupError.NotFound, decl_error);
 }
 
@@ -116,7 +117,7 @@ test "FindInType Enum Empty" {
     const sample_type_a = enum { a };
 
     // Enums cannot be empty (for now; due to an error in std.fmt:527:46 (@tagName of empty enum is impossible))
-    const decl_error = Metaplasia.FindInType(sample_type_a, "a", .Declaration);
+    const decl_error = Common.FindInType(sample_type_a, "a", .Declaration);
     try expectError(LookupError.TypeHasNoDeclarations, decl_error);
 }
 
@@ -130,20 +131,20 @@ test "FindInType Pointer" {
 
     // Try to find the field
     // First two should not error, the third should error
-    const field_type = try Metaplasia.FindInType(target_type, "a", .Field);
+    const field_type = try Common.FindInType(target_type, "a", .Field);
     try expect(field_type == i32);
-    const field_type_any = try Metaplasia.FindInType(target_type, "a", .Any);
+    const field_type_any = try Common.FindInType(target_type, "a", .Any);
     try expect(field_type_any == i32);
-    const field_error = Metaplasia.FindInType(target_type, "a", .Declaration);
+    const field_error = Common.FindInType(target_type, "a", .Declaration);
     try expectError(LookupError.NotFound, field_error);
 
     // Try to find the declaration
     // First two should not error, the third should error
-    const decl_type = try Metaplasia.FindInType(target_type, "b", .Declaration);
+    const decl_type = try Common.FindInType(target_type, "b", .Declaration);
     try expect(decl_type == i64);
-    const decl_type_any = try Metaplasia.FindInType(target_type, "b", .Any);
+    const decl_type_any = try Common.FindInType(target_type, "b", .Any);
     try expect(decl_type_any == i64);
-    const decl_error = Metaplasia.FindInType(target_type, "b", .Field);
+    const decl_error = Common.FindInType(target_type, "b", .Field);
     try expectError(LookupError.NotFound, decl_error);
 }
 
@@ -157,20 +158,20 @@ test "FindInType Optional" {
 
     // Try to find the field
     // First two should not error, the third should error
-    const field_type = try Metaplasia.FindInType(target_type, "a", .Field);
+    const field_type = try Common.FindInType(target_type, "a", .Field);
     try expect(field_type == i32);
-    const field_type_any = try Metaplasia.FindInType(target_type, "a", .Any);
+    const field_type_any = try Common.FindInType(target_type, "a", .Any);
     try expect(field_type_any == i32);
-    const field_error = Metaplasia.FindInType(target_type, "a", .Declaration);
+    const field_error = Common.FindInType(target_type, "a", .Declaration);
     try expectError(LookupError.NotFound, field_error);
 
     // Try to find the declaration
     // First two should not error, the third should error
-    const decl_type = try Metaplasia.FindInType(target_type, "b", .Declaration);
+    const decl_type = try Common.FindInType(target_type, "b", .Declaration);
     try expect(decl_type == i64);
-    const decl_type_any = try Metaplasia.FindInType(target_type, "b", .Any);
+    const decl_type_any = try Common.FindInType(target_type, "b", .Any);
     try expect(decl_type_any == i64);
-    const decl_error = Metaplasia.FindInType(target_type, "b", .Field);
+    const decl_error = Common.FindInType(target_type, "b", .Field);
     try expectError(LookupError.NotFound, decl_error);
 }
 
@@ -184,20 +185,20 @@ test "FindInType Error Union" {
 
     // Try to find the field
     // First two should not error, the third should error
-    const field_type = try Metaplasia.FindInType(target_type, "a", .Field);
+    const field_type = try Common.FindInType(target_type, "a", .Field);
     try expect(field_type == i32);
-    const field_type_any = try Metaplasia.FindInType(target_type, "a", .Any);
+    const field_type_any = try Common.FindInType(target_type, "a", .Any);
     try expect(field_type_any == i32);
-    const field_error = Metaplasia.FindInType(target_type, "a", .Declaration);
+    const field_error = Common.FindInType(target_type, "a", .Declaration);
     try expectError(LookupError.NotFound, field_error);
 
     // Try to find the declaration
     // First two should not error, the third should error
-    const decl_type = try Metaplasia.FindInType(target_type, "b", .Declaration);
+    const decl_type = try Common.FindInType(target_type, "b", .Declaration);
     try expect(decl_type == i64);
-    const decl_type_any = try Metaplasia.FindInType(target_type, "b", .Any);
+    const decl_type_any = try Common.FindInType(target_type, "b", .Any);
     try expect(decl_type_any == i64);
-    const decl_error = Metaplasia.FindInType(target_type, "b", .Field);
+    const decl_error = Common.FindInType(target_type, "b", .Field);
     try expectError(LookupError.NotFound, decl_error);
 }
 
@@ -211,20 +212,20 @@ test "FindInType Vector" {
 
     // Try to find the field
     // First two should not error, the third should error
-    const field_type = try Metaplasia.FindInType(target_type, "a", .Field);
+    const field_type = try Common.FindInType(target_type, "a", .Field);
     try expect(field_type == i32);
-    const field_type_any = try Metaplasia.FindInType(target_type, "a", .Any);
+    const field_type_any = try Common.FindInType(target_type, "a", .Any);
     try expect(field_type_any == i32);
-    const field_error = Metaplasia.FindInType(target_type, "a", .Declaration);
+    const field_error = Common.FindInType(target_type, "a", .Declaration);
     try expectError(LookupError.NotFound, field_error);
 
     // Try to find the declaration
     // First two should not error, the third should error
-    const decl_type = try Metaplasia.FindInType(target_type, "b", .Declaration);
+    const decl_type = try Common.FindInType(target_type, "b", .Declaration);
     try expect(decl_type == i64);
-    const decl_type_any = try Metaplasia.FindInType(target_type, "b", .Any);
+    const decl_type_any = try Common.FindInType(target_type, "b", .Any);
     try expect(decl_type_any == i64);
-    const decl_error = Metaplasia.FindInType(target_type, "b", .Field);
+    const decl_error = Common.FindInType(target_type, "b", .Field);
     try expectError(LookupError.NotFound, decl_error);
 }
 
@@ -238,19 +239,19 @@ test "FindInType Array" {
 
     // Try to find the field
     // First two should not error, the third should error
-    const field_type = try Metaplasia.FindInType(target_type, "a", .Field);
+    const field_type = try Common.FindInType(target_type, "a", .Field);
     try expect(field_type == i32);
-    const field_type_any = try Metaplasia.FindInType(target_type, "a", .Any);
+    const field_type_any = try Common.FindInType(target_type, "a", .Any);
     try expect(field_type_any == i32);
-    const field_error = Metaplasia.FindInType(target_type, "a", .Declaration);
+    const field_error = Common.FindInType(target_type, "a", .Declaration);
     try expectError(LookupError.NotFound, field_error);
 
     // Try to find the declaration
     // First two should not error, the third should error
-    const decl_type = try Metaplasia.FindInType(target_type, "b", .Declaration);
+    const decl_type = try Common.FindInType(target_type, "b", .Declaration);
     try expect(decl_type == i64);
-    const decl_type_any = try Metaplasia.FindInType(target_type, "b", .Any);
+    const decl_type_any = try Common.FindInType(target_type, "b", .Any);
     try expect(decl_type_any == i64);
-    const decl_error = Metaplasia.FindInType(target_type, "b", .Field);
+    const decl_error = Common.FindInType(target_type, "b", .Field);
     try expectError(LookupError.NotFound, decl_error);
 }
