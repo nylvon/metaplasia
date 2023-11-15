@@ -1,8 +1,8 @@
 # ➤ Metaplasia ⚡🦠
-
+![metaplasia_logo](https://github.com/nylvon/metaplasia/assets/116503189/d1028891-ee03-4c2b-9734-dd5f1e4f143d)
 ## What is this?
 
-**Metaplasia** is a library that offers users the ability to do a few _fun things_ with their types and objects in Zig, such as:
+**Metaplasia** is a library that offers users the ability to do a few _fun things_ with their types and objects in Zig, such as:![Uploading met<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 
 1. Easy reflection
 2. Interfaces
@@ -70,7 +70,6 @@ Blank means not implemented.
 
 - [ ] Reflection
 - [ ] Interfaces
-	- [x] #1
 - [ ] Type merging
 - [ ] Type generation
 
