@@ -6,4 +6,5 @@
 /// type mangling.
 pub const Metaplasia = @This();
 pub const Common = @import("common.zig");
+pub const Interface = @import("interface.zig");
 const std = @import("std");
