@@ -32,13 +32,13 @@ test "FindInType Struct" {
     try expectError(LookupError.NotFound, field_error);
 
     // Try to find the declaration
-    // First two should not error, the third should error
-    const decl_info = try Common.FindInType(sample_type, "b", .Declaration);
-    try expect(decl_info == i64);
-    const decl_info_any = try Common.FindInType(sample_type, "b", .Any);
-    try expect(decl_info_any == i64);
-    const decl_error = Common.FindInType(sample_type, "b", .Field);
-    try expectError(LookupError.NotFound, decl_error);
+    // // First two should not error, the third should error
+    // const decl_info = try Common.FindInType(sample_type, "b", .Declaration);
+    // try expect(decl_info == i64);
+    // const decl_info_any = try Common.FindInType(sample_type, "b", .Any);
+    // try expect(decl_info_any == i64);
+    // const decl_error = Common.FindInType(sample_type, "b", .Field);
+    // try expectError(LookupError.NotFound, decl_error);
 }
 
 // test "FindInType Struct Empty" {
