@@ -17,13 +17,54 @@ pub const LookupError = error{
     TypeHasNoFieldsOrDeclarations,
 };
 
+/// Contains the type that the declaration was gotten from as well as the declaration
+pub const FullDeclaration = struct {
+    decl: std.builtin.Type.Declaration,
+    type: type,
+};
+
+/// Contains the type that the enum field was gotten from as well as the enum field
+pub const FullEnumField = struct {
+    field: std.builtin.Type.EnumField,
+    type: type,
+};
+
+/// A Type Item is a part of a type, it is a wrapper over
+/// fields and declarations of all types
+pub const TypeItem = union {
+    // NOTE: Should be kept up to date with the language specification.
+    Declaration: FullDeclaration,
+    StructField: std.builtin.Type.StructField,
+    EnumField: FullEnumField,
+    UnionField: std.builtin.Type.UnionField,
+
+    /// Returns the type of the type item
+    pub fn GetType(comptime self: @This()) type {
+        switch (std.meta.activeTag(self)) {
+            .Declaration => |d| return @TypeOf(@field(d.type, d.decl.name)),
+            .StructField => |sf| return sf.type,
+            .EnumField => |ef| return ef.type,
+            .UnionField => |uf| return uf.type,
+        }
+    }
+};
+
 /// Internal use only. Looks up a field from a type-info struct.
-inline fn UnsafeFieldLookup(comptime type_info: anytype, comptime lookup_name: []const u8) LookupError!type {
+inline fn UnsafeFieldLookup(comptime target: type, comptime lookup_name: []const u8) LookupError!TypeItem {
     comptime {
+        const type_info = @TypeOf(target);
+
         if (type_info.fields.len == 0) return LookupError.TypeHasNoFields;
 
         for (type_info.fields) |field| {
-            if (std.mem.eql(u8, field.name, lookup_name)) return field.type;
+            if (std.mem.eql(u8, field.name, lookup_name)) {
+                switch (type_info) {
+                    .Struct => return TypeItem{ .StructField = field },
+                    .Enum => return TypeItem{ .EnumField = FullEnumField{ .field = field, .type = target } },
+                    .Union => return TypeItem{ .UnionField = field },
+                    else => @compileError("Please do not use this function on its own, as the checks for its usage are done outside its context!"),
+                }
+            }
         }
 
         // If we're here, we haven't found it
@@ -32,12 +73,14 @@ inline fn UnsafeFieldLookup(comptime type_info: anytype, comptime lookup_name: [
 }
 
 /// Internal use only. Looks up a declaration from a type-info struct.
-inline fn UnsafeDeclarationLookup(comptime from: type, comptime type_info: anytype, comptime lookup_name: []const u8) LookupError!type {
+inline fn UnsafeDeclarationLookup(comptime target: type, comptime lookup_name: []const u8) LookupError!TypeItem {
     comptime {
+        const type_info = @TypeOf(target);
+
         if (type_info.decls.len == 0) return LookupError.TypeHasNoDeclarations;
 
         for (type_info.decls) |decl| {
-            if (std.mem.eql(u8, decl.name, lookup_name)) return @TypeOf(@field(from, lookup_name));
+            if (std.mem.eql(u8, decl.name, lookup_name)) return TypeItem{ .Declaration = FullDeclaration{ .decl = decl, .type = type } };
         }
 
         // If we're here, we haven't found it
@@ -46,55 +89,23 @@ inline fn UnsafeDeclarationLookup(comptime from: type, comptime type_info: anyty
 }
 
 /// Internal use only. Looks up a field or declaraton from a type-info struct.
-inline fn UnsafeAnyLookup(comptime from: type, comptime type_info: anytype, comptime lookup_name: []const u8) LookupError!type {
+inline fn UnsafeAnyLookup(comptime type_info: anytype, comptime lookup_name: []const u8) LookupError!TypeItem {
     comptime {
         if (type_info.fields.len == 0 and type_info.decls.len == 0) return LookupError.TypeHasNoFieldsOrDeclarations;
 
         for (type_info.fields) |field| {
-            if (std.mem.eql(u8, field.name, lookup_name)) return field.type;
+            if (std.mem.eql(u8, field.name, lookup_name)) {
+                switch (@typeInfo(@TypeOf(type_info))) {
+                    .Struct => return TypeItem{ .StructField = field },
+                    .Enum => return TypeItem{ .EnumField = field },
+                    .Union => return TypeItem{ .UnionField = field },
+                    else => @compileError("Please do not use this function on its own, as the checks for its usage are done outside its context!"),
+                }
+            }
         }
 
         for (type_info.decls) |decl| {
-            if (std.mem.eql(u8, decl.name, lookup_name)) return @TypeOf(@field(from, lookup_name));
-        }
-
-        // If we're here, we haven't found it
-        return LookupError.NotFound;
-    }
-}
-
-// Internal use only. Creates a tuple type for the enum look-up result (used for .Field and .Any lookups on enums)
-pub fn EnumLookupResult(comptime from: type) type {
-    return struct { field: ?from, decl: ?type };
-}
-
-/// Internal use only. Looks up a field from a type-info struct. Used for enums
-inline fn UnsafeEnumFieldLookup(comptime from: type, comptime type_info: anytype, comptime lookup_name: []const u8) LookupError!from {
-    comptime {
-        if (type_info.fields.len == 0) return LookupError.TypeHasNoFields;
-
-        for (type_info.fields) |field| {
-            if (std.mem.eql(u8, field.name, lookup_name)) return @enumFromInt(field.value);
-        }
-
-        // If we're here, we haven't found it
-        return LookupError.NotFound;
-    }
-}
-
-/// Internal use only. Looks up a field or declaraton from a type-info struct. Used for enums.
-inline fn UnsafeEnumAnyLookup(comptime from: type, comptime type_info: anytype, comptime lookup_name: []const u8) LookupError!EnumLookupResult(from) {
-    comptime {
-        const ResultType = EnumLookupResult(from);
-
-        if (type_info.fields.len == 0 and type_info.decls.len == 0) return LookupError.TypeHasNoFieldsOrDeclarations;
-
-        for (type_info.fields) |field| {
-            if (std.mem.eql(u8, field.name, lookup_name)) return ResultType{ .field = @enumFromInt(field.value), .decl = null };
-        }
-
-        for (type_info.decls) |decl| {
-            if (std.mem.eql(u8, decl.name, lookup_name)) return ResultType{ .field = null, .decl = @TypeOf(@field(from, lookup_name)) };
+            if (std.mem.eql(u8, decl.name, lookup_name)) return TypeItem{ .Declaration = decl };
         }
 
         // If we're here, we haven't found it
@@ -103,7 +114,7 @@ inline fn UnsafeEnumAnyLookup(comptime from: type, comptime type_info: anytype, 
 }
 
 /// Internal use only. Looks up parameters from structs and unions.
-inline fn UnsafeLookup(comptime from: type, comptime type_info: anytype, comptime lookup_name: []const u8, comptime lookup_mode: LookupMode) LookupError!type {
+inline fn UnsafeLookup(comptime type_info: anytype, comptime lookup_name: []const u8, comptime lookup_mode: LookupMode) LookupError!TypeItem {
     comptime {
         switch (lookup_mode) {
             // Search for a field
@@ -112,35 +123,11 @@ inline fn UnsafeLookup(comptime from: type, comptime type_info: anytype, comptim
             },
             // Search for a declaration
             .Declaration => {
-                return UnsafeDeclarationLookup(from, type_info, lookup_name);
+                return UnsafeDeclarationLookup(type_info, lookup_name);
             },
             // Search for either
             .Any => {
-                return UnsafeAnyLookup(from, type_info, lookup_name);
-            },
-        }
-    }
-}
-
-/// Internal use only. Looks up parameters from enums.
-inline fn UnsafeEnumLookup(comptime from: type, comptime type_info: anytype, comptime lookup_name: []const u8, comptime lookup_mode: LookupMode) switch (lookup_mode) {
-    .Field => LookupError!from,
-    .Declaration => LookupError!type,
-    .Any => LookupError!EnumLookupResult(from),
-} {
-    comptime {
-        switch (lookup_mode) {
-            // Search for a field
-            .Field => {
-                return UnsafeEnumFieldLookup(from, type_info, lookup_name);
-            },
-            // Search for a declaration
-            .Declaration => {
-                return UnsafeDeclarationLookup(from, type_info, lookup_name);
-            },
-            // Search for either
-            .Any => {
-                return UnsafeEnumAnyLookup(from, type_info, lookup_name);
+                return UnsafeAnyLookup(type_info, lookup_name);
             },
         }
     }
@@ -148,24 +135,17 @@ inline fn UnsafeEnumLookup(comptime from: type, comptime type_info: anytype, com
 
 /// Tries to find a field or declaration given a name and a specified look-up mode
 /// Returns the type of the field/declaration if found, otherwise errors with details.
-pub fn FindInType(comptime from: type, comptime lookup_name: []const u8, comptime lookup_mode: LookupMode) switch (@typeInfo(from)) {
-    .Enum => switch (lookup_mode) {
-        .Field => LookupError!from,
-        .Declaration => LookupError!type,
-        .Any => LookupError!EnumLookupResult(from),
-    },
-    else => LookupError!type,
-} {
+pub fn FindInType(comptime from: type, comptime lookup_name: []const u8, comptime lookup_mode: LookupMode) LookupError!TypeItem {
     switch (@typeInfo(from)) {
         // Structs can have both fields and declarations
         .Struct => |struct_info| {
-            return UnsafeLookup(from, struct_info, lookup_name, lookup_mode);
+            return UnsafeLookup(struct_info, lookup_name, lookup_mode);
         },
         .Union => |uni_info| {
-            return UnsafeLookup(from, uni_info, lookup_name, lookup_mode);
+            return UnsafeLookup(uni_info, lookup_name, lookup_mode);
         },
         .Enum => |enu_info| {
-            return UnsafeEnumLookup(from, enu_info, lookup_name, lookup_mode);
+            return UnsafeLookup(enu_info, lookup_name, lookup_mode);
         },
         .Pointer => |ptr_info| {
             return FindInType(ptr_info.child, lookup_name, lookup_mode);
