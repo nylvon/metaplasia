@@ -31,7 +31,7 @@ pub const FullEnumField = struct {
 
 /// A Type Item is a part of a type, it is a wrapper over
 /// fields and declarations of all types
-pub const TypeItem = union {
+pub const TypeItem = union(enum) {
     // NOTE: Should be kept up to date with the language specification.
     Declaration: FullDeclaration,
     StructField: std.builtin.Type.StructField,
@@ -41,10 +41,11 @@ pub const TypeItem = union {
     /// Returns the type of the type item
     pub fn GetType(comptime self: @This()) type {
         switch (std.meta.activeTag(self)) {
-            .Declaration => |d| return @TypeOf(@field(d.type, d.decl.name)),
-            .StructField => |sf| return sf.type,
-            .EnumField => |ef| return ef.type,
-            .UnionField => |uf| return uf.type,
+            // NOTE: There's probably a prettier way of doing this. Look into it.
+            .Declaration => return @TypeOf(@field(self.Declaration.type, self.Declaration.decl.name)),
+            .StructField => return self.StructField.type,
+            .EnumField => return self.EnumField.type,
+            .UnionField => return self.UnionField.type,
         }
     }
 };
@@ -52,23 +53,22 @@ pub const TypeItem = union {
 /// Internal use only. Looks up a field from a type-info struct.
 inline fn UnsafeFieldLookup(comptime target: type, comptime lookup_name: []const u8) LookupError!TypeItem {
     comptime {
-        const pre_type_info = @typeInfo(target);
-
-        const type_info = switch (pre_type_info) {
-            .Struct => pre_type_info.Struct,
-            .Enum => pre_type_info.Enum,
-            .Union => pre_type_info.Union,
+        const type_info = switch (@typeInfo(target)) {
+            .Struct => |s| s,
+            .Enum => |e| e,
+            .Union => |u| u,
+            else => unreachable,
         };
 
         if (type_info.fields.len == 0) return LookupError.TypeHasNoFields;
 
         for (type_info.fields) |field| {
             if (std.mem.eql(u8, field.name, lookup_name)) {
-                switch (@typeInfo(@TypeOf(target))) {
+                switch (@typeInfo(target)) {
                     .Struct => return TypeItem{ .StructField = field },
                     .Enum => return TypeItem{ .EnumField = FullEnumField{ .field = field, .type = target } },
                     .Union => return TypeItem{ .UnionField = field },
-                    else => @compileError("Please do not use this function on its own, as the checks for its usage are done outside its context!"),
+                    else => unreachable,
                 }
             }
         }
@@ -81,7 +81,12 @@ inline fn UnsafeFieldLookup(comptime target: type, comptime lookup_name: []const
 /// Internal use only. Looks up a declaration from a type-info struct.
 inline fn UnsafeDeclarationLookup(comptime target: type, comptime lookup_name: []const u8) LookupError!TypeItem {
     comptime {
-        const type_info = @TypeOf(target);
+        const type_info = switch (@typeInfo(target)) {
+            .Struct => |s| s,
+            .Enum => |e| e,
+            .Union => |u| u,
+            else => unreachable,
+        };
 
         if (type_info.decls.len == 0) return LookupError.TypeHasNoDeclarations;
 
@@ -97,13 +102,18 @@ inline fn UnsafeDeclarationLookup(comptime target: type, comptime lookup_name: [
 /// Internal use only. Looks up a field or declaraton from a type-info struct.
 inline fn UnsafeAnyLookup(comptime target: type, comptime lookup_name: []const u8) LookupError!TypeItem {
     comptime {
-        const type_info = @typeInfo(target);
+        const type_info = switch (@typeInfo(target)) {
+            .Struct => |s| s,
+            .Enum => |e| e,
+            .Union => |u| u,
+            else => unreachable,
+        };
 
         if (type_info.fields.len == 0 and type_info.decls.len == 0) return LookupError.TypeHasNoFieldsOrDeclarations;
 
         for (type_info.fields) |field| {
             if (std.mem.eql(u8, field.name, lookup_name)) {
-                switch (type_info) {
+                switch (@typeInfo(target)) {
                     .Struct => return TypeItem{ .StructField = field },
                     .Enum => return TypeItem{ .EnumField = FullEnumField{ .field = field, .type = target } },
                     .Union => return TypeItem{ .UnionField = field },
