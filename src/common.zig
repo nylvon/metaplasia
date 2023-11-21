@@ -9,6 +9,7 @@ const std = @import("std");
 /// If Any is selected, fields are prioritised over declarations in the look-up order.
 pub const LookupMode = enum { Field, Declaration, Any };
 
+/// Used by FindInType to detail why the function call failed.
 pub const LookupError = error{
     InvalidType,
     NotFound,
@@ -17,50 +18,73 @@ pub const LookupError = error{
     TypeHasNoFieldsOrDeclarations,
 };
 
-/// Contains the type that the declaration was gotten from as well as the declaration
+/// Contains the type that the declaration was gotten from as well as the declaration.
 pub const FullDeclaration = struct {
     decl: std.builtin.Type.Declaration,
     type: type,
 };
 
-/// Contains the type that the enum field was gotten from as well as the enum field
+/// Contains the type that the enum field was gotten from as well as the enum field.
 pub const FullEnumField = struct {
     field: std.builtin.Type.EnumField,
     type: type,
 };
 
+/// This enum is used to identify the active part of the
+/// TypeItem union wrapper.
+pub const TypeItemKind = enum {
+    Declaration,
+    StructField,
+    EnumField,
+    UnionField,
+};
+
 /// A Type Item is a part of a type, it is a wrapper over
-/// fields and declarations of all types
-pub const TypeItem = union(enum) {
+/// fields and declarations of all types.
+pub const TypeItem = union(TypeItemKind) {
     // NOTE: Should be kept up to date with the language specification.
     Declaration: FullDeclaration,
     StructField: std.builtin.Type.StructField,
     EnumField: FullEnumField,
     UnionField: std.builtin.Type.UnionField,
 
-    /// Returns the type of the entity described
+    /// The error set that can be returned by the functions of the TypeItem wrapper.
+    pub const Error = error{
+        InvalidType,
+    };
+
+    /// Returns the type of the entity described.
     pub fn GetType(comptime self: @This()) type {
-        switch (std.meta.activeTag(self)) {
-            // NOTE: There's probably a prettier way of doing this. Look into it.
-            .Declaration => return @TypeOf(@field(self.Declaration.type, self.Declaration.decl.name)),
-            .StructField => return self.StructField.type,
-            .EnumField => return self.EnumField.type,
-            .UnionField => return self.UnionField.type,
+        switch (self) {
+            .Declaration => |d| return @TypeOf(@field(d.type, d.decl.name)),
+            .StructField => |sf| return sf.type,
+            .EnumField => |ef| return ef.type,
+            .UnionField => |uf| return uf.type,
         }
     }
 
-    /// Returns the name of the entity described
+    /// Returns the name of the entity described.
     pub fn GetName(comptime self: @This()) []const u8 {
-        switch (std.meta.activeTag(self)) {
-            // NOTE: There's probably a prettier way of doing this. Look into it.
-            .Declaration => return self.Declaration.decl.name,
-            .StructField => return self.StructField.name,
-            .EnumField => return self.EnumField.field.name,
-            .UnionField => return self.UnionField.name,
+        switch (self) {
+            .Declaration => |d| return d.decl.name,
+            .StructField => |sf| return sf.name,
+            .EnumField => |ef| return ef.field.name,
+            .UnionField => |uf| return uf.name,
         }
     }
 
-    // pub fn GetDefaultValue(comptime self: @This()) !switch
+    /// Returns the default value of the entity described.
+    /// If the entity doesn't have a default value, null will be returned.
+    /// If the entity cannot have a default value, an error will be returned.
+    pub fn GetDefaultValue(comptime self: @This()) switch (self) {
+        .Declaration, .EnumField, .UnionField => TypeItem.Error,
+        .StructField => ?*const anyopaque,
+    } {
+        switch (self) {
+            .Declaration, .EnumField, .UnionField => return TypeItem.Error.InvalidType,
+            .StructField => |sf| return sf.default_value,
+        }
+    }
 };
 
 /// Internal use only. Looks up a field from a type-info struct.
@@ -86,7 +110,7 @@ inline fn UnsafeFieldLookup(comptime target: type, comptime lookup_name: []const
             }
         }
 
-        // If we're here, we haven't found it
+        // If we're here, we haven't found it.
         return LookupError.NotFound;
     }
 }
@@ -107,7 +131,7 @@ inline fn UnsafeDeclarationLookup(comptime target: type, comptime lookup_name: [
             if (std.mem.eql(u8, decl.name, lookup_name)) return TypeItem{ .Declaration = FullDeclaration{ .decl = decl, .type = target } };
         }
 
-        // If we're here, we haven't found it
+        // If we're here, we haven't found it.
         return LookupError.NotFound;
     }
 }
@@ -139,7 +163,7 @@ inline fn UnsafeAnyLookup(comptime target: type, comptime lookup_name: []const u
             if (std.mem.eql(u8, decl.name, lookup_name)) return TypeItem{ .Declaration = FullDeclaration{ .decl = decl, .type = target } };
         }
 
-        // If we're here, we haven't found it
+        // If we're here, we haven't found it.
         return LookupError.NotFound;
     }
 }
@@ -164,7 +188,7 @@ inline fn UnsafeLookup(comptime target: type, comptime lookup_name: []const u8, 
     }
 }
 
-/// Tries to find a field or declaration given a name and a specified look-up mode
+/// Tries to find a field or declaration given a name and a specified look-up mode.
 /// Returns the type of the field/declaration if found, otherwise errors with details.
 pub fn FindInType(comptime from: type, comptime lookup_name: []const u8, comptime lookup_mode: LookupMode) LookupError!TypeItem {
     switch (@typeInfo(from)) {
