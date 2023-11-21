@@ -38,7 +38,7 @@ pub const TypeItem = union(enum) {
     EnumField: FullEnumField,
     UnionField: std.builtin.Type.UnionField,
 
-    /// Returns the type of the type item
+    /// Returns the type of the entity described
     pub fn GetType(comptime self: @This()) type {
         switch (std.meta.activeTag(self)) {
             // NOTE: There's probably a prettier way of doing this. Look into it.
@@ -48,6 +48,19 @@ pub const TypeItem = union(enum) {
             .UnionField => return self.UnionField.type,
         }
     }
+
+    /// Returns the name of the entity described
+    pub fn GetName(comptime self: @This()) []const u8 {
+        switch (std.meta.activeTag(self)) {
+            // NOTE: There's probably a prettier way of doing this. Look into it.
+            .Declaration => return self.Declaration.decl.name,
+            .StructField => return self.StructField.name,
+            .EnumField => return self.EnumField.field.name,
+            .UnionField => return self.UnionField.name,
+        }
+    }
+
+    // pub fn GetDefaultValue(comptime self: @This()) !switch
 };
 
 /// Internal use only. Looks up a field from a type-info struct.
@@ -91,7 +104,7 @@ inline fn UnsafeDeclarationLookup(comptime target: type, comptime lookup_name: [
         if (type_info.decls.len == 0) return LookupError.TypeHasNoDeclarations;
 
         for (type_info.decls) |decl| {
-            if (std.mem.eql(u8, decl.name, lookup_name)) return TypeItem{ .Declaration = FullDeclaration{ .decl = decl, .type = type } };
+            if (std.mem.eql(u8, decl.name, lookup_name)) return TypeItem{ .Declaration = FullDeclaration{ .decl = decl, .type = target } };
         }
 
         // If we're here, we haven't found it
@@ -123,7 +136,7 @@ inline fn UnsafeAnyLookup(comptime target: type, comptime lookup_name: []const u
         }
 
         for (type_info.decls) |decl| {
-            if (std.mem.eql(u8, decl.name, lookup_name)) return TypeItem{ .Declaration = FullDeclaration{ .decl = decl, .type = type } };
+            if (std.mem.eql(u8, decl.name, lookup_name)) return TypeItem{ .Declaration = FullDeclaration{ .decl = decl, .type = target } };
         }
 
         // If we're here, we haven't found it
