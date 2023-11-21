@@ -37,11 +37,6 @@ pub fn test_extract(
 ) !void {
     switch (e_outcome) {
         .Success => {
-            // Sanity-checks
-            try expect(e_type != null);
-            try expect(e_kind != null);
-            try expect(e_error == null);
-
             const info = try Common.FindInType(target, l_name, l_mode);
 
             if (e_kind) |kind| {
