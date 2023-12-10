@@ -9,6 +9,7 @@
 pub const CommonTests = @This();
 const Common = @import("common.zig").Common;
 const TypeItemKind = Common.TypeItemKind;
+const TypeItemMutability = Common.TypeItemMutability;
 const LookupMode = Common.LookupMode;
 const LookupError = Common.LookupError;
 const std = @import("std");
@@ -23,7 +24,7 @@ const eql = std.mem.eql;
 
 /// Convenience wrapper for testing the
 /// FindInType function over types.
-pub fn test_extract(
+pub fn test_findintype(
     // L = Look-up
     // E = Expected
     comptime target: type,
@@ -72,38 +73,38 @@ test "FindInType" {
         pub const b: i64 = 10;
     };
 
-    try test_extract(test_struct, "a", .Field, i32, .StructField, null, .Success, null);
-    try test_extract(test_struct, "a", .Any, i32, .StructField, null, .Success, null);
-    try test_extract(test_struct, "b", .Declaration, i64, .Declaration, null, .Success, null);
-    try test_extract(test_struct, "b", .Any, i64, .Declaration, null, .Success, null);
+    try test_findintype(test_struct, "a", .Field, i32, .StructField, null, .Success, null);
+    try test_findintype(test_struct, "a", .Any, i32, .StructField, null, .Success, null);
+    try test_findintype(test_struct, "b", .Declaration, i64, .Declaration, null, .Success, null);
+    try test_findintype(test_struct, "b", .Any, i64, .Declaration, null, .Success, null);
 
-    try test_extract(test_struct, "a", .Declaration, null, null, null, .Failure, LookupError.NotFound);
-    try test_extract(test_struct, "b", .Field, null, null, null, .Failure, LookupError.NotFound);
+    try test_findintype(test_struct, "a", .Declaration, null, null, null, .Failure, LookupError.NotFound);
+    try test_findintype(test_struct, "b", .Field, null, null, null, .Failure, LookupError.NotFound);
 
     const test_struct_empty = struct {};
 
-    try test_extract(test_struct_empty, "", .Field, null, null, null, .Failure, LookupError.TypeHasNoFields);
-    try test_extract(test_struct_empty, "", .Declaration, null, null, null, .Failure, LookupError.TypeHasNoDeclarations);
-    try test_extract(test_struct_empty, "", .Any, null, null, null, .Failure, LookupError.TypeHasNoFieldsOrDeclarations);
+    try test_findintype(test_struct_empty, "", .Field, null, null, null, .Failure, LookupError.TypeHasNoFields);
+    try test_findintype(test_struct_empty, "", .Declaration, null, null, null, .Failure, LookupError.TypeHasNoDeclarations);
+    try test_findintype(test_struct_empty, "", .Any, null, null, null, .Failure, LookupError.TypeHasNoFieldsOrDeclarations);
 
     const test_union = union {
         a: i32,
         pub const b: i64 = 10;
     };
 
-    try test_extract(test_union, "a", .Field, i32, .UnionField, null, .Success, null);
-    try test_extract(test_union, "a", .Any, i32, .UnionField, null, .Success, null);
-    try test_extract(test_union, "b", .Declaration, i64, .Declaration, null, .Success, null);
-    try test_extract(test_union, "b", .Any, i64, .Declaration, null, .Success, null);
+    try test_findintype(test_union, "a", .Field, i32, .UnionField, null, .Success, null);
+    try test_findintype(test_union, "a", .Any, i32, .UnionField, null, .Success, null);
+    try test_findintype(test_union, "b", .Declaration, i64, .Declaration, null, .Success, null);
+    try test_findintype(test_union, "b", .Any, i64, .Declaration, null, .Success, null);
 
-    try test_extract(test_union, "a", .Declaration, null, null, null, .Failure, LookupError.NotFound);
-    try test_extract(test_union, "b", .Field, null, null, null, .Failure, LookupError.NotFound);
+    try test_findintype(test_union, "a", .Declaration, null, null, null, .Failure, LookupError.NotFound);
+    try test_findintype(test_union, "b", .Field, null, null, null, .Failure, LookupError.NotFound);
 
     const test_union_empty = union {};
 
-    try test_extract(test_union_empty, "", .Field, null, null, null, .Failure, LookupError.TypeHasNoFields);
-    try test_extract(test_union_empty, "", .Declaration, null, null, null, .Failure, LookupError.TypeHasNoDeclarations);
-    try test_extract(test_union_empty, "", .Any, null, null, null, .Failure, LookupError.TypeHasNoFieldsOrDeclarations);
+    try test_findintype(test_union_empty, "", .Field, null, null, null, .Failure, LookupError.TypeHasNoFields);
+    try test_findintype(test_union_empty, "", .Declaration, null, null, null, .Failure, LookupError.TypeHasNoDeclarations);
+    try test_findintype(test_union_empty, "", .Any, null, null, null, .Failure, LookupError.TypeHasNoFieldsOrDeclarations);
 
     const test_enum = enum {
         a,
@@ -112,19 +113,19 @@ test "FindInType" {
 
     // NOTE: Rethink the expected type on an enum. Maybe the enum should return the actual enum selector?
     //       Maybe a different function would be of use.
-    try test_extract(test_enum, "a", .Field, test_enum, .EnumField, null, .Success, null);
-    try test_extract(test_enum, "a", .Any, test_enum, .EnumField, null, .Success, null);
-    try test_extract(test_enum, "b", .Declaration, i64, .Declaration, null, .Success, null);
-    try test_extract(test_enum, "b", .Any, i64, .Declaration, null, .Success, null);
+    try test_findintype(test_enum, "a", .Field, test_enum, .EnumField, null, .Success, null);
+    try test_findintype(test_enum, "a", .Any, test_enum, .EnumField, null, .Success, null);
+    try test_findintype(test_enum, "b", .Declaration, i64, .Declaration, null, .Success, null);
+    try test_findintype(test_enum, "b", .Any, i64, .Declaration, null, .Success, null);
 
-    try test_extract(test_enum, "a", .Declaration, null, null, null, .Failure, LookupError.NotFound);
-    try test_extract(test_enum, "b", .Field, null, null, null, .Failure, LookupError.NotFound);
+    try test_findintype(test_enum, "a", .Declaration, null, null, null, .Failure, LookupError.NotFound);
+    try test_findintype(test_enum, "b", .Field, null, null, null, .Failure, LookupError.NotFound);
 
     const test_enum_empty = enum {};
 
-    try test_extract(test_enum_empty, "", .Field, null, null, null, .Failure, LookupError.TypeHasNoFields);
-    try test_extract(test_enum_empty, "", .Declaration, null, null, null, .Failure, LookupError.TypeHasNoDeclarations);
-    try test_extract(test_enum_empty, "", .Any, null, null, null, .Failure, LookupError.TypeHasNoFieldsOrDeclarations);
+    try test_findintype(test_enum_empty, "", .Field, null, null, null, .Failure, LookupError.TypeHasNoFields);
+    try test_findintype(test_enum_empty, "", .Declaration, null, null, null, .Failure, LookupError.TypeHasNoDeclarations);
+    try test_findintype(test_enum_empty, "", .Any, null, null, null, .Failure, LookupError.TypeHasNoFieldsOrDeclarations);
 
     //
     // For pointers, optionals, error unions, vectors and arrays
@@ -136,51 +137,51 @@ test "FindInType" {
 
     const test_pointer = *test_struct;
 
-    try test_extract(test_pointer, "a", .Field, i32, .StructField, null, .Success, null);
-    try test_extract(test_pointer, "a", .Any, i32, .StructField, null, .Success, null);
-    try test_extract(test_pointer, "b", .Declaration, i64, .Declaration, null, .Success, null);
-    try test_extract(test_pointer, "b", .Any, i64, .Declaration, null, .Success, null);
+    try test_findintype(test_pointer, "a", .Field, i32, .StructField, null, .Success, null);
+    try test_findintype(test_pointer, "a", .Any, i32, .StructField, null, .Success, null);
+    try test_findintype(test_pointer, "b", .Declaration, i64, .Declaration, null, .Success, null);
+    try test_findintype(test_pointer, "b", .Any, i64, .Declaration, null, .Success, null);
 
-    try test_extract(test_pointer, "a", .Declaration, null, null, null, .Failure, LookupError.NotFound);
-    try test_extract(test_pointer, "b", .Field, null, null, null, .Failure, LookupError.NotFound);
+    try test_findintype(test_pointer, "a", .Declaration, null, null, null, .Failure, LookupError.NotFound);
+    try test_findintype(test_pointer, "b", .Field, null, null, null, .Failure, LookupError.NotFound);
 
     const test_optional = ?test_struct;
 
-    try test_extract(test_optional, "a", .Field, i32, .StructField, null, .Success, null);
-    try test_extract(test_optional, "a", .Any, i32, .StructField, null, .Success, null);
-    try test_extract(test_optional, "b", .Declaration, i64, .Declaration, null, .Success, null);
-    try test_extract(test_optional, "b", .Any, i64, .Declaration, null, .Success, null);
+    try test_findintype(test_optional, "a", .Field, i32, .StructField, null, .Success, null);
+    try test_findintype(test_optional, "a", .Any, i32, .StructField, null, .Success, null);
+    try test_findintype(test_optional, "b", .Declaration, i64, .Declaration, null, .Success, null);
+    try test_findintype(test_optional, "b", .Any, i64, .Declaration, null, .Success, null);
 
-    try test_extract(test_optional, "a", .Declaration, null, null, null, .Failure, LookupError.NotFound);
-    try test_extract(test_optional, "b", .Field, null, null, null, .Failure, LookupError.NotFound);
+    try test_findintype(test_optional, "a", .Declaration, null, null, null, .Failure, LookupError.NotFound);
+    try test_findintype(test_optional, "b", .Field, null, null, null, .Failure, LookupError.NotFound);
 
     const test_error_union = anyerror!test_struct;
 
-    try test_extract(test_error_union, "a", .Field, i32, .StructField, null, .Success, null);
-    try test_extract(test_error_union, "a", .Any, i32, .StructField, null, .Success, null);
-    try test_extract(test_error_union, "b", .Declaration, i64, .Declaration, null, .Success, null);
-    try test_extract(test_error_union, "b", .Any, i64, .Declaration, null, .Success, null);
+    try test_findintype(test_error_union, "a", .Field, i32, .StructField, null, .Success, null);
+    try test_findintype(test_error_union, "a", .Any, i32, .StructField, null, .Success, null);
+    try test_findintype(test_error_union, "b", .Declaration, i64, .Declaration, null, .Success, null);
+    try test_findintype(test_error_union, "b", .Any, i64, .Declaration, null, .Success, null);
 
-    try test_extract(test_error_union, "a", .Declaration, null, null, null, .Failure, LookupError.NotFound);
-    try test_extract(test_error_union, "b", .Field, null, null, null, .Failure, LookupError.NotFound);
+    try test_findintype(test_error_union, "a", .Declaration, null, null, null, .Failure, LookupError.NotFound);
+    try test_findintype(test_error_union, "b", .Field, null, null, null, .Failure, LookupError.NotFound);
 
     const test_vector = @Vector(4, *test_struct);
 
-    try test_extract(test_vector, "a", .Field, i32, .StructField, null, .Success, null);
-    try test_extract(test_vector, "a", .Any, i32, .StructField, null, .Success, null);
-    try test_extract(test_vector, "b", .Declaration, i64, .Declaration, null, .Success, null);
-    try test_extract(test_vector, "b", .Any, i64, .Declaration, null, .Success, null);
+    try test_findintype(test_vector, "a", .Field, i32, .StructField, null, .Success, null);
+    try test_findintype(test_vector, "a", .Any, i32, .StructField, null, .Success, null);
+    try test_findintype(test_vector, "b", .Declaration, i64, .Declaration, null, .Success, null);
+    try test_findintype(test_vector, "b", .Any, i64, .Declaration, null, .Success, null);
 
-    try test_extract(test_vector, "a", .Declaration, null, null, null, .Failure, LookupError.NotFound);
-    try test_extract(test_vector, "b", .Field, null, null, null, .Failure, LookupError.NotFound);
+    try test_findintype(test_vector, "a", .Declaration, null, null, null, .Failure, LookupError.NotFound);
+    try test_findintype(test_vector, "b", .Field, null, null, null, .Failure, LookupError.NotFound);
 
     const test_array = [4]test_struct;
 
-    try test_extract(test_array, "a", .Field, i32, .StructField, null, .Success, null);
-    try test_extract(test_array, "a", .Any, i32, .StructField, null, .Success, null);
-    try test_extract(test_array, "b", .Declaration, i64, .Declaration, null, .Success, null);
-    try test_extract(test_array, "b", .Any, i64, .Declaration, null, .Success, null);
+    try test_findintype(test_array, "a", .Field, i32, .StructField, null, .Success, null);
+    try test_findintype(test_array, "a", .Any, i32, .StructField, null, .Success, null);
+    try test_findintype(test_array, "b", .Declaration, i64, .Declaration, null, .Success, null);
+    try test_findintype(test_array, "b", .Any, i64, .Declaration, null, .Success, null);
 
-    try test_extract(test_array, "a", .Declaration, null, null, null, .Failure, LookupError.NotFound);
-    try test_extract(test_array, "b", .Field, null, null, null, .Failure, LookupError.NotFound);
+    try test_findintype(test_array, "a", .Declaration, null, null, null, .Failure, LookupError.NotFound);
+    try test_findintype(test_array, "b", .Field, null, null, null, .Failure, LookupError.NotFound);
 }

@@ -5,6 +5,13 @@
 pub const Common = @This();
 const std = @import("std");
 
+/// Small container for look-ups.
+/// TODO: Refactor using this type.
+pub const LookupData = struct {
+    lookup_name: []const u8,
+    lookup_mode: LookupMode,
+};
+
 /// Restricts look-up to only fields or declarations, or does not restrict at all.
 /// If Any is selected, fields are prioritised over declarations in the look-up order.
 pub const LookupMode = enum { Field, Declaration, Any };
@@ -38,6 +45,9 @@ pub const TypeItemKind = enum {
     EnumField,
     UnionField,
 };
+
+/// The mutability of a TypeItem entity.
+pub const TypeItemMutability = enum { Variable, Constant };
 
 /// A Type Item is a part of a type, it is a wrapper over
 /// fields and declarations of all types.
@@ -77,12 +87,12 @@ pub const TypeItem = union(TypeItemKind) {
     /// If the entity doesn't have a default value, null will be returned.
     /// If the entity cannot have a default value, an error will be returned.
     pub fn GetDefaultValue(comptime self: @This()) switch (self) {
-        .Declaration, .EnumField, .UnionField => TypeItem.Error,
         .StructField => ?*const anyopaque,
+        else => TypeItem.Error,
     } {
         switch (self) {
-            .Declaration, .EnumField, .UnionField => return TypeItem.Error.InvalidType,
             .StructField => |sf| return sf.default_value,
+            else => return TypeItem.Error.InvalidType,
         }
     }
 };
