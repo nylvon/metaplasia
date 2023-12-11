@@ -35,5 +35,6 @@ pub fn build(b: *std.Build) void {
 
     const test_step = b.step("test", "Run library tests");
 
-    test_step.dependOn(add_tests(b, "test_common", "Run common library tests", "src/common_tests.zig", target, optimize));
+    test_step.dependOn(add_tests(b, "common_tests", "Run the unit tests for the Common library.", "src/common_tests.zig", target, optimize));
+    test_step.dependOn(add_tests(b, "rule_tests", "Run the unit tests for the Rule type.", "src/rule_tests.zig", target, optimize));
 }

@@ -44,7 +44,64 @@ pub const Kind = enum {
 ///       rules are checked against it (and pass).
 const Rule_internal = union(Kind) {
     /// Checks whether a field or declaration is within the definition of the type.
-    IsInType: struct {
+    IsInType: IsInTypeRule,
+
+    IsInTypeMembers: IsInTypeRule,
+
+    /// Checks whether a field or declaration is of a specified type within the definition of the type.
+    IsOfType: IsOfTypeRule,
+
+    /// Checks whether the given member is of a specific kind of types.
+    /// (i.e. std.builtin.Type.Int of any bits)
+    /// TODO: Re-think this.
+    ///       Maybe we could pull it off with just some custom rules?
+    IsOfTypeKind: void,
+
+    /// Checks whether a field or declaration is a function within the definition of the type.
+    IsFunction: IsFunctionRule,
+
+    /// Checks whether a field or declaration is variable within the definition of the type.
+    IsVariable: IsVariableRule,
+
+    /// Checks whether a field or declaration is constant within the definition of the type.
+    IsConstant: IsConstantRule,
+
+    /// Checks whether a field or declaration is available at compile time within the definition of the type.
+    IsComptime: IsComptimeRule,
+
+    /// Checks according to the custom definition given by a custom descriptor type.
+    /// All custom descriptors must obey the rule definition interface IRuleDefinition.
+    /// TODO: Define IRuleDefinition, and make sure all rules are checked against it.
+    /// TODO: When interfaces are implemented, use an interface typechecker here.
+    ///       (Or maybe somewhere else?).
+    CustomDefinition: CustomDefinitionRule,
+
+    //
+    // Rule operations below
+    //
+
+    /// Calls the rule descriptor's 'Check' function.
+    pub fn Check(comptime self: @This(), comptime target: type) !bool {
+        switch (self) {
+            // NOTE: "ir" stands for "inner rule".
+            .IsInType => |ir| return ir.Check(target),
+            .IsInTypeMembers => |ir| return ir.Check(target),
+            .IsOfType => |ir| return ir.Check(target),
+            .IsOfTypeKind => |ir| return ir.Check(target),
+            .IsFunction => |ir| return ir.Check(target),
+            .IsVariable => |ir| return ir.Check(target),
+            .IsConstant => |ir| return ir.Check(target),
+            .IsComptime => |ir| return ir.Check(target),
+            // .CustomDefinition => |cd| return cd.Check(target),
+            else => return error.NotImplemented,
+        }
+    }
+
+    //
+    // Rule types below
+    //
+
+    pub const IsInTypeRule = struct {
         lookup_data: Common.LookupData,
 
         pub fn Check(comptime self: @This(), comptime target: type) !bool {
@@ -55,10 +112,19 @@ const Rule_internal = union(Kind) {
             };
             return true;
         }
-    },
+    };
 
-    /// Checks whether a field or declaration is a function within the definition of the type.
-    IsFunction: struct {
+    pub const IsOfTypeRule = struct {
+        lookup_data: Common.LookupData,
+        lookup_type: type,
+
+        pub fn Check(comptime self: @This(), comptime target: type) !bool {
+            const lookup = try Common.FindInType(target, self.lookup_data.lookup_name, self.lookup_data.lookup_mode);
+            return lookup.GetType() == self.lookup_type;
+        }
+    };
+
+    pub const IsFunctionRule = struct {
         lookup_data: Common.LookupData,
 
         pub fn Check(comptime self: @This(), comptime target: type) !bool {
@@ -70,10 +136,9 @@ const Rule_internal = union(Kind) {
             // Below may do the same thing as above, I can't remember if it is the exact same, though.
             // return std.meta.activeTag(@typeInfo(lookup.GetType())) == .Fn;
         }
-    },
+    };
 
-    /// Checks whether a field or declaration is variable within the definition of the type.
-    IsVariable: struct {
+    pub const IsVariableRule = struct {
         lookup_data: Common.LookupData,
 
         pub fn Check(comptime self: @This(), comptime target: type) !bool {
@@ -82,10 +147,9 @@ const Rule_internal = union(Kind) {
             // If it didn't change, it wasn't constant.
             return type_before == @constCast(type_before);
         }
-    },
+    };
 
-    /// Checks whether a field or declaration is constant within the definition of the type.
-    IsConstant: struct {
+    pub const IsConstantRule = struct {
         lookup_data: Common.LookupData,
 
         pub fn Check(comptime self: @This(), comptime target: type) !bool {
@@ -94,10 +158,9 @@ const Rule_internal = union(Kind) {
             // If it became variable now, it means that it was constant before.
             return type_before != @constCast(type_before);
         }
-    },
+    };
 
-    /// Checks whether a field or declaration is available at compile time within the definition of the type.
-    IsComptime: struct {
+    pub const IsComptimeRule = struct {
         lookup_data: Common.LookupData,
 
         pub fn Check(comptime self: @This(), comptime target: type) !bool {
@@ -106,43 +169,14 @@ const Rule_internal = union(Kind) {
             // TODO: Add GetIsComptime to TypeItem in Common
             return error.NotImplemented;
         }
-    },
+    };
 
-    /// Checks whether a field or declaration is of a specified type within the definition of the type.
-    IsOfType: struct {
-        lookup_data: Common.LookupData,
-        lookup_type: type,
-
-        pub fn Check(comptime self: @This(), comptime target: type) !bool {
-            const lookup = try Common.FindInType(target, self.lookup_data.lookup_name, self.lookup_data.lookup_mode);
-            return lookup.GetType() == self.lookup_type;
-        }
-    },
-
-    /// Checks whether the given member is of a specific kind of types.
-    /// (i.e. std.builtin.Type.Int of any bits)
-    /// TODO: Re-think this.
-    ///       Maybe we could pull it off with just some custom rules?
-    IsOfTypeKind: struct {
-        lookup_data: Common.LookupData,
-        lookup_kind: std.builtin.Type,
-
-        pub fn Check(comptime self: @This(), comptime target: type) !bool {
-            _ = target;
-            _ = self;
-            // TODO: Come up with a proper definition for this rule.
-            //       Maybe leave it as custom rules.
-            return error.NotImplemented;
-        }
-    },
-
-    /// Checks according to the custom definition given by a custom descriptor type.
-    /// All custom descriptors must obey the rule definition interface IRuleDefinition.
-    /// TODO: Define IRuleDefinition, and make sure all rules are checked against it.
-    /// TODO: When interfaces are implemented, use an interface typechecker here.
-    ///       (Or maybe somewhere else?).
-    CustomDefinition: struct {
+    pub const CustomDefinitionRule = struct {
+        // NOTE: This won't work unless the data is baked into the type.
+        // TODO: How do we do this?
         definition: type,
+        // NOTE: Are anyopaques going to fix this?
+        //def: anyopaque,
 
         // Placeholder for interface typechecker.
         // (Will be replaced, of course)
@@ -155,96 +189,5 @@ const Rule_internal = union(Kind) {
             // TODO: Think about it.
             return self.definition.Check(target);
         }
-    },
+    };
 };
-
-// NOTE: Below is obsolete code, which will get reworked into
-//       the new framework above, or get removed completely.
-
-// kind: Kind,
-// name: []const u8,
-// children: ?[]const Rule,
-
-// /// Checks whether the children conditions match
-// pub fn CheckChildren(comptime self: *const Rule, comptime target: type) !bool {
-//     var checked = true;
-//     if (self.children) |*children| {
-//         for (children) |*c| {
-//             checked &= c.Check(target);
-//         }
-//     }
-//     return checked;
-// }
-
-// /// Checks whether a type matches a rule
-// pub fn Check(comptime self: *const Rule, comptime target: type) !bool {
-//     switch (self.kind) {
-//         .IsField => {
-//             // If there's no types, it'll return false.
-//             // If there's another error, it'll return it.
-//             _ = Common.FindInType(target, self.name, .Field) catch |err| {
-//                 switch (err) {
-//                     .NotFound => return false,
-//                     else => return err,
-//                 }
-//             };
-
-//             // TODO: Think of a better way to do this.
-//             var checked = true;
-//             if (self.children) |*children| {
-//                 for (children) |*c| {
-//                     checked &= c.Check(target);
-//                 }
-//             }
-//             return checked;
-//         },
-//         .IsDeclaration => {
-//             _ = Common.FindInType(target, self.name, .Declaration) catch |err| {
-//                 switch (err) {
-//                     .NotFound => return false,
-//                     else => return err,
-//                 }
-//             };
-
-//             return true;
-//         },
-//         .IsInType => {
-//             _ = Common.FindInType(target, self.name, .Any) catch |err| {
-//                 switch (err) {
-//                     .NotFound => return false,
-//                     else => return err,
-//                 }
-//             };
-
-//             return true;
-//         },
-//         .IsFunction => {
-//             const type_item = Common.FindInType(target, self.name, .Any) catch |err| {
-//                 switch (err) {
-//                     .NotFound => return false,
-//                     else => return err,
-//                 }
-//             };
-
-//             const info = @typeInfo(type_item.GetType());
-//             switch (info) {
-//                 .Fn => return true,
-//                 else => return false,
-//             }
-//         },
-//         .IsVariable => {
-//             const type_item = Common.FindInType(target, self.name, .Declaration) catch |err| {
-//                 switch (err) {
-//                     .NotFound => return false,
-//                     else => return err,
-//                 }
-//             };
-
-//             const decl_type = type_item.GetType();
-//             if (@constCast(decl_type) == decl_type) {
-//                 return true;
-//             } else return false;
-//         },
-//         else => return error.NotImplemented, // TODO: Implement the rest
-//     }
-// }
