@@ -66,9 +66,9 @@ test "Check" {
     try expect(o_isfunction == false);
 
     // TODO: Rework how IsVariable and IsConstant work.
-    // TODO: Add "GetMutability" function to TypeItem in Common.
+    // TODO: Add "GetIsConstant" function to TypeItem in Common.
     //       -> It should return whether the member (field/decl)
-    //       -> is mutable (variable) or not (const).
+    //       -> is constant or not.
 
     // IsVariable
     // const r_isvariable = Rule{ .IsVariable = .{
@@ -84,7 +84,7 @@ test "Check" {
     // const o_isconstant = try r_isconstant.Check(test_struct);
     // try expect(o_isconstant == false);
 
-    // NOTE: Add "GetAvailability" function to TypeItem in Common.
+    // NOTE: Add "GetIsComptime" function to TypeItem in Common.
     //       -> It should return if the item is available
-    //       -> at compile time or at runtime (or both).
+    //       -> at compile time or not.
 }
