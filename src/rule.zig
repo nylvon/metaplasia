@@ -11,16 +11,8 @@ pub const Kind = enum {
     /// Look-up must be within the type definition.
     IsInType,
 
-    /// Look-up must be within the definition of any types within the type definition.
-    /// Depth for look-up is set, and filters are also set.
-    IsInTypeMembers,
-
     /// Look-up must be of a given type.
-    IsOfType,
-
-    /// Look-up must be bound(?) within a given type set (Ints of any bits, etc).
-    /// TODO: Rethink this.
-    IsOfTypeKind,
+    IsType,
 
     /// Look-up must be a function type.
     IsFunction,
@@ -30,9 +22,6 @@ pub const Kind = enum {
 
     /// Look-up must be a constant.
     IsConstant,
-
-    /// Look-up must be available at compile time.
-    IsComptime,
 
     /// Custom Rules? (?)
     CustomDefinition,
@@ -46,16 +35,8 @@ const Rule_internal = union(Kind) {
     /// Checks whether a field or declaration is within the definition of the type.
     IsInType: IsInTypeRule,
 
-    IsInTypeMembers: IsInTypeRule,
-
     /// Checks whether a field or declaration is of a specified type within the definition of the type.
-    IsOfType: IsOfTypeRule,
-
-    /// Checks whether the given member is of a specific kind of types.
-    /// (i.e. std.builtin.Type.Int of any bits)
-    /// TODO: Re-think this.
-    ///       Maybe we could pull it off with just some custom rules?
-    IsOfTypeKind: void,
+    IsType: IsTypeRule,
 
     /// Checks whether a field or declaration is a function within the definition of the type.
     IsFunction: IsFunctionRule,
@@ -66,14 +47,7 @@ const Rule_internal = union(Kind) {
     /// Checks whether a field or declaration is constant within the definition of the type.
     IsConstant: IsConstantRule,
 
-    /// Checks whether a field or declaration is available at compile time within the definition of the type.
-    IsComptime: IsComptimeRule,
-
-    /// Checks according to the custom definition given by a custom descriptor type.
-    /// All custom descriptors must obey the rule definition interface IRuleDefinition.
-    /// TODO: Define IRuleDefinition, and make sure all rules are checked against it.
-    /// TODO: When interfaces are implemented, use an interface typechecker here.
-    ///       (Or maybe somewhere else?).
+    /// Checks according to the custom checking function and custom rule data.
     CustomDefinition: CustomDefinitionRule,
 
     //
@@ -85,15 +59,11 @@ const Rule_internal = union(Kind) {
         switch (self) {
             // NOTE: "ir" stands for "inner rule".
             .IsInType => |ir| return ir.Check(target),
-            .IsInTypeMembers => |ir| return ir.Check(target),
-            .IsOfType => |ir| return ir.Check(target),
-            .IsOfTypeKind => |ir| return ir.Check(target),
+            .IsType => |ir| return ir.Check(target),
             .IsFunction => |ir| return ir.Check(target),
             .IsVariable => |ir| return ir.Check(target),
             .IsConstant => |ir| return ir.Check(target),
-            .IsComptime => |ir| return ir.Check(target),
-            // .CustomDefinition => |cd| return cd.Check(target),
-            else => return error.NotImplemented,
+            .CustomDefinition => |ir| return ir.Check(target),
         }
     }
 
@@ -114,7 +84,7 @@ const Rule_internal = union(Kind) {
         }
     };
 
-    pub const IsOfTypeRule = struct {
+    pub const IsTypeRule = struct {
         lookup_data: Common.LookupData,
         lookup_type: type,
 
@@ -143,9 +113,7 @@ const Rule_internal = union(Kind) {
 
         pub fn Check(comptime self: @This(), comptime target: type) !bool {
             const lookup = try Common.FindInType(target, self.lookup_data.lookup_name, self.lookup_data.lookup_mode);
-            const type_before = lookup.GetType();
-            // If it didn't change, it wasn't constant.
-            return type_before == @constCast(type_before);
+            return lookup.GetIsVariable();
         }
     };
 
@@ -154,40 +122,16 @@ const Rule_internal = union(Kind) {
 
         pub fn Check(comptime self: @This(), comptime target: type) !bool {
             const lookup = try Common.FindInType(target, self.lookup_data.lookup_name, self.lookup_data.lookup_mode);
-            const type_before = lookup.GetType();
-            // If it became variable now, it means that it was constant before.
-            return type_before != @constCast(type_before);
-        }
-    };
-
-    pub const IsComptimeRule = struct {
-        lookup_data: Common.LookupData,
-
-        pub fn Check(comptime self: @This(), comptime target: type) !bool {
-            const lookup = try Common.FindInType(target, self.lookup_data.lookup_name, self.lookup_data.lookup_mode);
-            _ = lookup;
-            // TODO: Add GetIsComptime to TypeItem in Common
-            return error.NotImplemented;
+            return lookup.GetIsConstant();
         }
     };
 
     pub const CustomDefinitionRule = struct {
-        // NOTE: This won't work unless the data is baked into the type.
-        // TODO: How do we do this?
-        definition: type,
-        // NOTE: Are anyopaques going to fix this?
-        //def: anyopaque,
-
-        // Placeholder for interface typechecker.
-        // (Will be replaced, of course)
-        // TODO: Replace with something proper
-        //       when typechecker is implemented.
-        pub const InterfacePass: bool = false;
+        check_fn: *const fn (comptime type, comptime *anyopaque) anyerror!bool,
+        rule_data: *anyopaque,
 
         pub fn Check(comptime self: @This(), comptime target: type) !bool {
-            // Or maybe do the check here before returning?
-            // TODO: Think about it.
-            return self.definition.Check(target);
+            return self.check_fn(target, self.rule_data);
         }
     };
 };

@@ -44,19 +44,13 @@ test "Check" {
     const o_isintype = try r_isintype.Check(test_struct);
     try expect(o_isintype == true);
 
-    // NOTE: IsInTypeMembers is not checked right now
-    //       because it is still being developed.
-
     // IsOfType
-    const r_isoftype = Rule{ .IsOfType = .{
+    const r_isoftype = Rule{ .IsType = .{
         .lookup_data = lookup_a_any,
         .lookup_type = i32,
     } };
     const o_isoftype = try r_isoftype.Check(test_struct);
     try expect(o_isoftype == true);
-
-    // NOTE: IsOfTypeKind is not checked right now
-    //       because it is still being developed.
 
     // IsFunction
     const r_isfunction = Rule{ .IsFunction = .{
@@ -65,11 +59,8 @@ test "Check" {
     const o_isfunction = try r_isfunction.Check(test_struct);
     try expect(o_isfunction == false);
 
-    // TODO: Rework how IsVariable and IsConstant work.
-    // TODO: Add "GetIsConstant" function to TypeItem in Common.
-    //       -> It should return whether the member (field/decl)
-    //       -> is constant or not.
-
+    // ! IsVariable and IsConstant aren't yet implemented.
+    // TODO: Once implemented, set up these tests.
     // IsVariable
     // const r_isvariable = Rule{ .IsVariable = .{
     //     .lookup_data = lookup_a_any,
@@ -83,8 +74,4 @@ test "Check" {
     // } };
     // const o_isconstant = try r_isconstant.Check(test_struct);
     // try expect(o_isconstant == false);
-
-    // NOTE: Add "GetIsComptime" function to TypeItem in Common.
-    //       -> It should return if the item is available
-    //       -> at compile time or not.
 }

@@ -5,6 +5,10 @@
 pub const Common = @This();
 const std = @import("std");
 
+/// NOTE: A temporary string to showcase that a feature is not available due
+///       to the language spec not letting it be possible to implement right now.
+pub const NotInLangSpecString = "This is not implemented. Zig does not yet expose this information.";
+
 /// Small container for look-ups.
 /// TODO: Refactor using this type.
 pub const LookupData = struct {
@@ -96,33 +100,19 @@ pub const TypeItem = union(TypeItemKind) {
         }
     }
 
+    /// ! This is not implemented right now !
+    /// ! Zig does not yet expose this information !
     /// Returns whether the entity described has a constant value.
-    /// NOTE: This is still WIP.
     pub fn GetIsConstant(comptime self: @This()) bool {
-        switch (self) {
-            .Declaration => |decl| {
-                switch (@typeInfo(decl.GetType())) {
-                    .Pointer => |ptr| return ptr.is_const,
-                    else => return false,
-                }
-            },
-            else => return false,
-        }
+        _ = self;
+        @compileError(NotInLangSpecString);
     }
 
+    /// ! This is not implemented right now !
+    /// ! Zig does not yet expose this information !
     /// Returns whether the entity described has a non-constant value.
     pub fn GetIsVariable(comptime self: @This()) bool {
         return !self.GetIsConstant();
-    }
-
-    /// Returns whether the entity described is available at compile time.
-    /// NOTE: This is still WIP.
-    pub fn GetIsComptime(comptime self: @This()) bool {
-        switch (self) {
-            .StructField => |sf| return sf.is_comptime,
-            // NOTE: This is not correct, I just have not implemented the rest.
-            else => return false,
-        }
     }
 };
 
