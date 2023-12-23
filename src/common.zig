@@ -5,10 +5,6 @@
 pub const Common = @This();
 const std = @import("std");
 
-/// NOTE: A temporary string to showcase that a feature is not available due
-///       to the language spec not letting it be possible to implement right now.
-pub const NotInLangSpecString = "This is not implemented. Zig does not yet expose this information.";
-
 /// Small container for look-ups.
 /// TODO: Refactor using this type.
 pub const LookupData = struct {
@@ -33,6 +29,7 @@ pub const LookupError = error{
 pub const FullDeclaration = struct {
     decl: std.builtin.Type.Declaration,
     type: type,
+    is_const: bool,
 };
 
 /// Contains the type that the enum field was gotten from as well as the enum field.
@@ -100,16 +97,14 @@ pub const TypeItem = union(TypeItemKind) {
         }
     }
 
-    /// ! This is not implemented right now !
-    /// ! Zig does not yet expose this information !
     /// Returns whether the entity described has a constant value.
     pub fn GetIsConstant(comptime self: @This()) bool {
-        _ = self;
-        @compileError(NotInLangSpecString);
+        switch (self) {
+            .Declaration => |d| return d.is_const,
+            else => return false,
+        }
     }
 
-    /// ! This is not implemented right now !
-    /// ! Zig does not yet expose this information !
     /// Returns whether the entity described has a non-constant value.
     pub fn GetIsVariable(comptime self: @This()) bool {
         return !self.GetIsConstant();
@@ -157,7 +152,12 @@ inline fn UnsafeDeclarationLookup(comptime target: type, comptime lookup_name: [
         if (type_info.decls.len == 0) return LookupError.TypeHasNoDeclarations;
 
         for (type_info.decls) |decl| {
-            if (std.mem.eql(u8, decl.name, lookup_name)) return TypeItem{ .Declaration = FullDeclaration{ .decl = decl, .type = target } };
+            if (std.mem.eql(u8, decl.name, lookup_name))
+                return TypeItem{ .Declaration = FullDeclaration{
+                    .decl = decl,
+                    .type = target,
+                    .is_const = @typeInfo(@TypeOf(&@field(target, decl.name))).Pointer.is_const,
+                } };
         }
 
         // If we're here, we haven't found it.
@@ -183,13 +183,18 @@ inline fn UnsafeAnyLookup(comptime target: type, comptime lookup_name: []const u
                     .Struct => return TypeItem{ .StructField = field },
                     .Enum => return TypeItem{ .EnumField = FullEnumField{ .field = field, .type = target } },
                     .Union => return TypeItem{ .UnionField = field },
-                    else => @compileError("Please do not use this function on its own, as the checks for its usage are done outside its context!"),
+                    else => @compileError("Please do not use this function on its own, as this function does not do any checks on the inputs!"),
                 }
             }
         }
 
         for (type_info.decls) |decl| {
-            if (std.mem.eql(u8, decl.name, lookup_name)) return TypeItem{ .Declaration = FullDeclaration{ .decl = decl, .type = target } };
+            if (std.mem.eql(u8, decl.name, lookup_name))
+                return TypeItem{ .Declaration = FullDeclaration{
+                    .decl = decl,
+                    .type = target,
+                    .is_const = @typeInfo(@TypeOf(&@field(target, decl.name))).Pointer.is_const,
+                } };
         }
 
         // If we're here, we haven't found it.
