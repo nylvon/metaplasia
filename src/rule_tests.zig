@@ -18,11 +18,11 @@ const activeTag = std.meta.activeTag;
 const eql = std.mem.eql;
 
 // Check tests
-// NOTE: Crudely implemented just to test out whether the idea works.
 
 test "Check" {
     const test_struct = struct {
         a: i32,
+        c: *const fn (void) void,
         pub const b: i64 = 10;
     };
 
@@ -31,11 +31,16 @@ test "Check" {
         .lookup_name = "a",
         .lookup_mode = .Any,
     };
+    const lookup_b_decl = LookupData{
+        .lookup_name = "b",
+        .lookup_mode = .Declaration,
+    };
+    const lookup_c_fn_field = LookupData{
+        .lookup_name = "c",
+        .lookup_mode = .Field,
+    };
 
     // NOTE: All rules below assume a correct look-up.
-    // TODO: Check behavior when look-up fails and ensure
-    //       it returns the expected look-up error.
-    // TODO: Tidy up everything, (maybe?) put it in a function.
 
     // IsInType
     const r_isintype = Rule{ .IsInType = .{
@@ -55,23 +60,50 @@ test "Check" {
     // IsFunction
     const r_isfunction = Rule{ .IsFunction = .{
         .lookup_data = lookup_a_any,
+        .strict = false,
     } };
     const o_isfunction = try r_isfunction.Check(test_struct);
     try expect(o_isfunction == false);
 
-    // ! IsVariable and IsConstant aren't yet implemented.
-    // TODO: Once implemented, set up these tests.
-    // IsVariable
-    // const r_isvariable = Rule{ .IsVariable = .{
-    //     .lookup_data = lookup_a_any,
-    // } };
-    // const o_isvariable = try r_isvariable.Check(test_struct);
-    // try expect(o_isvariable == true);
+    const r_isfunction_field = Rule{ .IsFunction = .{
+        .lookup_data = lookup_c_fn_field,
+        .strict = false,
+    } };
+    const o_isfunction_field = try r_isfunction_field.Check(test_struct);
+    try expect(o_isfunction_field == true);
 
-    // IsConstant
-    // const r_isconstant = Rule{ .IsConstant = .{
-    //     .lookup_data = lookup_a_any,
-    // } };
-    // const o_isconstant = try r_isconstant.Check(test_struct);
-    // try expect(o_isconstant == false);
+    const r_isfunction_field_strict = Rule{ .IsFunction = .{
+        .lookup_data = lookup_c_fn_field,
+        .strict = true,
+    } };
+    const o_isfunction_field_strict = try r_isfunction_field_strict.Check(test_struct);
+    try expect(o_isfunction_field_strict == false);
+
+    // IsVariable For Fields
+    const r_isvariable_field = Rule{ .IsVariable = .{
+        .lookup_data = lookup_a_any,
+    } };
+    const o_isvariable_field = try r_isvariable_field.Check(test_struct);
+    try expect(o_isvariable_field == true);
+
+    // IsConstant For Fields
+    const r_isconstant_field = Rule{ .IsConstant = .{
+        .lookup_data = lookup_a_any,
+    } };
+    const o_isconstant_field = try r_isconstant_field.Check(test_struct);
+    try expect(o_isconstant_field == false);
+
+    // IsVariable For Declarations
+    const r_isvariable_decl = Rule{ .IsVariable = .{
+        .lookup_data = lookup_b_decl,
+    } };
+    const o_isvariable_decl = try r_isvariable_decl.Check(test_struct);
+    try expect(o_isvariable_decl == false);
+
+    // IsConstant For Declarations
+    const r_isconstant_decl = Rule{ .IsConstant = .{
+        .lookup_data = lookup_b_decl,
+    } };
+    const o_isconstant_decl = try r_isconstant_decl.Check(test_struct);
+    try expect(o_isconstant_decl == true);
 }

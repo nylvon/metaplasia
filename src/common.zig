@@ -230,21 +230,21 @@ pub fn FindInType(comptime from: type, comptime lookup_name: []const u8, comptim
         .Struct, .Union, .Enum => {
             return UnsafeLookup(from, lookup_name, lookup_mode);
         },
-        .Pointer => |ptr_info| {
-            return FindInType(ptr_info.child, lookup_name, lookup_mode);
-        },
-        .Vector => |vec_info| {
-            return FindInType(vec_info.child, lookup_name, lookup_mode);
-        },
-        .Optional => |opt_info| {
-            return FindInType(opt_info.child, lookup_name, lookup_mode);
-        },
-        .Array => |arr_info| {
-            return FindInType(arr_info.child, lookup_name, lookup_mode);
-        },
-        .ErrorUnion => |eru_info| {
-            return FindInType(eru_info.payload, lookup_name, lookup_mode);
+        .Pointer, .Vector, .Optional, .Array, .ErrorUnion => {
+            return FindInType(GetBaseType(from), lookup_name, lookup_mode);
         },
         else => return LookupError.InvalidType,
+    }
+}
+
+/// Gets the base type of any pointer/vector/array/etc type.
+pub fn GetBaseType(comptime from: type) type {
+    switch (@typeInfo(from)) {
+        .Pointer => |ptr| return GetBaseType(ptr.child),
+        .Vector => |vec| return GetBaseType(vec.child),
+        .Optional => |opt| return GetBaseType(opt.child),
+        .Array => |arr| return GetBaseType(arr.child),
+        .ErrorUnion => |eru| return GetBaseType(eru.payload),
+        else => return from,
     }
 }

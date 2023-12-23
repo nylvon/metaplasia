@@ -39,6 +39,8 @@ const Rule_internal = union(Kind) {
     IsType: IsTypeRule,
 
     /// Checks whether a field or declaration is a function within the definition of the type.
+    /// If "strict" is not set, it will return true for pointers to functions, function arrays, etc.
+    /// If "strict" is set, it will only return true for functions.
     IsFunction: IsFunctionRule,
 
     /// Checks whether a field or declaration is variable within the definition of the type.
@@ -96,15 +98,21 @@ const Rule_internal = union(Kind) {
 
     pub const IsFunctionRule = struct {
         lookup_data: Common.LookupData,
+        strict: bool,
 
         pub fn Check(comptime self: @This(), comptime target: type) !bool {
             const lookup = try Common.FindInType(target, self.lookup_data.lookup_name, self.lookup_data.lookup_mode);
-            switch (@typeInfo(lookup.GetType())) {
+            comptime var base_type = lookup.GetType();
+
+            // If not strict, we can check if it's "some form" of a function.
+            if (!self.strict) {
+                base_type = Common.GetBaseType(base_type);
+            }
+
+            switch (@typeInfo(base_type)) {
                 .Fn => return true,
                 else => return false,
             }
-            // Below may do the same thing as above, I can't remember if it is the exact same, though.
-            // return std.meta.activeTag(@typeInfo(lookup.GetType())) == .Fn;
         }
     };
 
