@@ -2,7 +2,7 @@
 ![metaplasia_logo](https://github.com/nylvon/metaplasia/assets/116503189/d1028891-ee03-4c2b-9734-dd5f1e4f143d)
 ## What is this?
 
-**Metaplasia** is a library that offers users the ability to do a few _fun things_ with their types and objects in Zig, such as:![Uploading met<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+**Metaplasia** is a library that offers users the ability to do a few _fun things_ with their types and objects in Zig, such as:
 
 1. Easy reflection
 2. Interfaces
@@ -16,18 +16,17 @@
 But they also serve an important role as sanity checks for your code!
 ```zig
 // A simple reader interface
-const IReader = Interface.init([_]Field {
-		Interface.new_variable("buffer", []u8),
-		Interface.new_function("read_fn", [_]type {[]u8, []u8}, []u8)
-	});
+const IReader =
+	Blank()
+		.And(IsInType(FindFieldAs("buffer", []u8))
+		.And(IsInType(FindFunctionAs("read_fn", fn([]u8, []u8) []u8));
 
 // "grant" returns the type defined below at compile-time if and only if it implements IReader 
-const custom_reader_type = Interface.grant(IReader,
-	.{
+const custom_reader_type = IReader.Grant(
+	struct {
 		buffer: []u8,
-		read_fn: fn ([]u8, []u8) []u8 = custom_read_fn,
 
-		pub fn custom_read_fn(path: []u8, options: []u8) []u8 {
+		pub fn read_fn(path: []u8, options: []u8) []u8 {
 			// ...
 		}
 	});
@@ -39,24 +38,24 @@ const writer_type = struct { ... };
 const reader_type = struct { ... };
 
 // Obtain a writer and reader combined type
-const writer_reader_type = Metaplasia.merge([_]type {writer_type, reader_type});
+const writer_reader_type = InferAndMerge([_]type {writer_type, reader_type});
 
 // Safe type-merging
-const safe_writer_type = Interface.grant(IWriter, .{ ... });
-const safe_reader_type = Interface.grant(IReader, .{ ... });
+const safe_writer_type = IWriter.Grant(struct { ... });
+const safe_reader_type = IReader.Grant(struct { ... });
 
 // This type matches both interfaces, because the original types matched them, if not, we'd get a compile error explaining the situation!
 // This type can be used as both a writer and a reader, swap freely!
-const safe_writer_reader_type = Metaplasia.merge([_]type {safe_writer_type, safe_reader_type});
+const safe_writer_reader_type = InferAndMerge([_]type {safe_writer_type, safe_reader_type});
 ```
 
 - Now think of a game, where you would have a lot of types, and you would want to re-use them to build more advanced, complex types based off of the original ones. Or, what about procedural types?
 ```zig
 // Some base type that's going to be used in a lot of places
-const entity_type = Metaplasia.merge([_]type {health_type, damage_type, identity_type, ...});
+const entity_type = InferAndMerge([_]type {health_type, damage_type, identity_type, ...});
 
 // A new player type that 'extends' the entity type. Inheritance, but without all the fuss!
-const player_type = Metaplasia.merge([_]type {entity_type, physics_type, chat_type, ... });
+const player_type = InferAndMerge([_]type {entity_type, physics_type, chat_type, ... });
 
 // ...
 	// insert example for procedural types
@@ -68,8 +67,8 @@ const player_type = Metaplasia.merge([_]type {entity_type, physics_type, chat_ty
 Below is the status of current features.
 Blank means not implemented.
 
-- [ ] Reflection
-- [ ] Interfaces
+- [x] Reflection (#2)
+- [x] Interfaces (#5)
 - [ ] Type merging
 - [ ] Type generation
 
