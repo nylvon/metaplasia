@@ -1,145 +1,187 @@
 /// Metaplasia Rule
 /// ©2023 Cristian Vasilache (NNCV / Nylvon)
 ///
-/// A rule is a constraint for a type.
-pub const Rule = Rule_internal;
+/// A rule is a function that validates a constraint on a type.
+/// A ruleset is a set of rules that validate multiple constraints in any manner.
+pub const Rule = @This();
 const Common = @import("common.zig");
 const std = @import("std");
 
-/// All base rules
-pub const Kind = enum {
-    /// Look-up must be within the type definition.
-    IsInType,
+/// Similar to std.meta.trait's TraitFn, but it can also return errors.
+/// Useful for debugging why something doesn't validate a rule.
+pub const RuleFn = fn (comptime type) anyerror!bool;
 
-    /// Look-up must be of a given type.
-    IsType,
+/// A rule set is a decision tree that upon traversal determines whether
+/// a type meets certain criteria, and if not, returns all the errors.
+pub const RuleSet = struct {
+    rule: ?RuleFn,
+    children: ?[]const RuleSet,
+    link: Link,
+    outcome: ?anyerror!bool,
 
-    /// Look-up must be a function type.
-    IsFunction,
-
-    /// Look-up must be a variable.
-    IsVariable,
-
-    /// Look-up must be a constant.
-    IsConstant,
-
-    /// Custom Rules? (?)
-    CustomDefinition,
-};
-
-/// An all-encompassing wrapper for rules for types.
-/// All rules must validate the IRule interface.
-/// TODO: When typechecking is implemented, make sure all
-///       rules are checked against it (and pass).
-const Rule_internal = union(Kind) {
-    /// Checks whether a field or declaration is within the definition of the type.
-    IsInType: IsInTypeRule,
-
-    /// Checks whether a field or declaration is of a specified type within the definition of the type.
-    IsType: IsTypeRule,
-
-    /// Checks whether a field or declaration is a function within the definition of the type.
-    /// If "strict" is not set, it will return true for pointers to functions, function arrays, etc.
-    /// If "strict" is set, it will only return true for functions.
-    IsFunction: IsFunctionRule,
-
-    /// Checks whether a field or declaration is variable within the definition of the type.
-    IsVariable: IsVariableRule,
-
-    /// Checks whether a field or declaration is constant within the definition of the type.
-    IsConstant: IsConstantRule,
-
-    /// Checks according to the custom checking function and custom rule data.
-    CustomDefinition: CustomDefinitionRule,
+    /// Determines how this rule is linked with the previous rule.
+    pub const Link = enum {
+        Root, // Reserved for the root rule-set.
+        And, // Previous rule is valid if this one is also valid.
+        Or, // Previous rule may be valid if this one isn't.
+        // TODO: Add more links.
+        // NOTE: Is it necessary?
+    };
 
     //
-    // Rule operations below
+    //  Rule-set generation utilities
     //
 
-    /// Calls the rule descriptor's 'Check' function.
-    pub fn Check(comptime self: @This(), comptime target: type) !bool {
-        switch (self) {
-            // NOTE: "ir" stands for "inner rule".
-            .IsInType => |ir| return ir.Check(target),
-            .IsType => |ir| return ir.Check(target),
-            .IsFunction => |ir| return ir.Check(target),
-            .IsVariable => |ir| return ir.Check(target),
-            .IsConstant => |ir| return ir.Check(target),
-            .CustomDefinition => |ir| return ir.Check(target),
+    /// Returns a blank rule-set.
+    /// Used to return a root rule-set node.
+    pub fn Blank() RuleSet {
+        return RuleSet{
+            .rule = null,
+            .children = null,
+            .link = .Root,
+            .outcome = null,
+        };
+    }
+
+    /// Returns an insular rule-set from a rule function.
+    pub fn From(comptime rule: RuleFn, comptime link: RuleSet.Link) RuleSet {
+        return RuleSet{
+            .rule = rule,
+            .children = null,
+            .link = link,
+            .outcome = null,
+        };
+    }
+
+    /// Adds the specified rule-set to the current one as a child of it.
+    /// Returns a pointer to the current rule-set after modifying it.
+    pub fn Inject(comptime self: *const RuleSet, comptime ruleset: RuleSet) *const RuleSet {
+        if (self.children != null) {
+            const new_ruleset = RuleSet{
+                //
+                .rule = self.rule,
+                .link = self.link,
+                .outcome = self.outcome,
+                .children = self.children.? ++ &[1]RuleSet{ruleset},
+            };
+            return &new_ruleset;
+        } else {
+            const new_ruleset = RuleSet{
+                //
+                .rule = self.rule,
+                .link = self.link,
+                .outcome = self.outcome,
+                .children = &[1]RuleSet{ruleset},
+            };
+            return &new_ruleset;
+            // self.children = [1]RuleSet{ruleset};
+            // var new_ruleset = RuleSet{ .rule = self.rule, .link = self.link, .outcome = self.outcome, .children = @constCast(&[1]RuleSet{ruleset}) };
+            // return &new_ruleset;
         }
     }
 
-    //
-    // Rule types below
-    //
+    /// Adds another rule with an "and" relationship to the current rule-set.
+    /// Returns a pointer to the current rule-set after modifying it.
+    pub fn And(comptime self: *const RuleSet, comptime rule: RuleFn) *const RuleSet {
+        const new_ruleset = From(rule, .And);
+        return self.Inject(new_ruleset);
+    }
 
-    pub const IsInTypeRule = struct {
-        lookup_data: Common.LookupData,
+    /// Adds another rule with an "or" relationship to the current rule-set.
+    /// Returns a pointer to the current rule-set after modifying it.
+    pub fn Or(comptime self: *const RuleSet, comptime rule: RuleFn) *const RuleSet {
+        const new_ruleset = From(rule, .Or);
+        return self.Inject(new_ruleset);
+    }
 
-        pub fn Check(comptime self: @This(), comptime target: type) !bool {
-            _ = Common.FindInType(target, self.lookup_data.lookup_name, self.lookup_data.lookup_mode) catch |err| {
-                if (err == Common.LookupError.NotFound) {
-                    return false;
-                } else return err;
-            };
-            return true;
-        }
-    };
-
-    pub const IsTypeRule = struct {
-        lookup_data: Common.LookupData,
-        lookup_type: type,
-
-        pub fn Check(comptime self: @This(), comptime target: type) !bool {
-            const lookup = try Common.FindInType(target, self.lookup_data.lookup_name, self.lookup_data.lookup_mode);
-            return lookup.GetType() == self.lookup_type;
-        }
-    };
-
-    pub const IsFunctionRule = struct {
-        lookup_data: Common.LookupData,
-        strict: bool,
-
-        pub fn Check(comptime self: @This(), comptime target: type) !bool {
-            const lookup = try Common.FindInType(target, self.lookup_data.lookup_name, self.lookup_data.lookup_mode);
-            comptime var base_type = lookup.GetType();
-
-            // If not strict, we can check if it's "some form" of a function.
-            if (!self.strict) {
-                base_type = Common.GetBaseType(base_type);
+    /// Prints the ruleset as a string
+    pub fn Print(comptime self: *const RuleSet, comptime index: usize) []const u8 {
+        comptime var pad: []const u8 = "";
+        comptime {
+            for (0..index) |i| {
+                _ = i;
+                pad = pad ++ "\t";
             }
-
-            switch (@typeInfo(base_type)) {
-                .Fn => return true,
-                else => return false,
+            switch (self.link) {
+                .And => pad = pad ++ "AND",
+                .Or => pad = pad ++ "OR",
+                .Root => pad = pad ++ "ROOT",
+            }
+            pad = pad ++ "\n";
+            if (self.children) |children| {
+                for (children) |c| {
+                    pad = pad ++ c.Print(index + 1);
+                }
             }
         }
-    };
+        return pad;
+    }
+};
 
-    pub const IsVariableRule = struct {
-        lookup_data: Common.LookupData,
+//
+//  Basic rules
+//
 
-        pub fn Check(comptime self: @This(), comptime target: type) !bool {
-            const lookup = try Common.FindInType(target, self.lookup_data.lookup_name, self.lookup_data.lookup_mode);
+/// Checks whether a looked-up member is inside a type.
+/// eg: Whether a struct has a member "check" that is a declaration.
+pub fn IsInType(comptime lookup_data: Common.LookupData) RuleFn {
+    return struct {
+        pub fn rule(comptime target: type) anyerror!bool {
+            return Common.FindInType(target, lookup_data.lookup_name, lookup_data.lookup_mode);
+        }
+    }.rule;
+}
+
+/// Checks whether a looked-up member is of a certain type.
+/// eg: Whether a struct has a member "check" that is of "fn(void) void" type.
+pub fn IsType(comptime lookup_data: Common.LookupData, comptime wanted_type: type) RuleFn {
+    return struct {
+        pub fn rule(comptime target: type) anyerror!bool {
+            const lookup = try Common.FindInType(target, lookup_data.lookup_name, lookup_data.lookup_mode);
+            return lookup.GetType() == wanted_type;
+        }
+    }.rule;
+}
+
+/// Checks whether a looked-up member is of a certain archetype.
+/// eg: Whether a struct has a member "check" that is a function (.Fn archetype)
+pub fn IsArchetype(comptime lookup_data: Common.LookupData, comptime archetype: std.meta.tags(std.builtin.Type)) RuleFn {
+    return struct {
+        pub fn rule(comptime target: type) anyerror!bool {
+            const lookup = try Common.FindInType(target, lookup_data.lookup_name, lookup_data.lookup_mode);
+            return std.meta.activeTag(@typeInfo(lookup.GetType())) == archetype;
+        }
+    }.rule;
+}
+
+/// Checks whether a looked-up member is of a function archetype
+/// This is a specialised case of "IsArchetype".
+pub fn IsFunction(comptime lookup_data: Common.LookupData) RuleFn {
+    return struct {
+        pub fn rule(comptime target: type) anyerror!bool {
+            return IsArchetype(lookup_data, .Fn)(target);
+        }
+    }.rule;
+}
+
+/// Checks whether a looked-up member is variable.
+/// eg: Whether a struct has a declaration "check" whose value can be changed.
+pub fn IsVariable(comptime lookup_data: Common.LookupData) RuleFn {
+    return struct {
+        pub fn rule(comptime target: type) anyerror!bool {
+            const lookup = try Common.FindInType(target, lookup_data.lookup_name, lookup_data.lookup_mode);
             return lookup.GetIsVariable();
         }
-    };
+    }.rule;
+}
 
-    pub const IsConstantRule = struct {
-        lookup_data: Common.LookupData,
-
-        pub fn Check(comptime self: @This(), comptime target: type) !bool {
-            const lookup = try Common.FindInType(target, self.lookup_data.lookup_name, self.lookup_data.lookup_mode);
+/// Checks whether a looked-up member is constant.
+/// eg: Whether a struct has a declaration "check" whose value can't be changed.
+pub fn IsConstant(comptime lookup_data: Common.LookupData) RuleFn {
+    return struct {
+        pub fn rule(comptime target: type) anyerror!bool {
+            const lookup = try Common.FindInType(target, lookup_data.lookup_name, lookup_data.lookup_mode);
             return lookup.GetIsConstant();
         }
-    };
-
-    pub const CustomDefinitionRule = struct {
-        check_fn: *const fn (comptime type, comptime *anyopaque) anyerror!bool,
-        rule_data: *anyopaque,
-
-        pub fn Check(comptime self: @This(), comptime target: type) !bool {
-            return self.check_fn(target, self.rule_data);
-        }
-    };
-};
+    }.rule;
+}
