@@ -16,6 +16,34 @@ pub const LookupData = struct {
 /// If Any is selected, fields are prioritised over declarations in the look-up order.
 pub const LookupMode = enum { Field, Declaration, Any };
 
+//
+//  Convenience wrappers
+//
+
+/// Generates lookup info for a field given a name.
+pub fn FindField(name: []const u8) LookupData {
+    return LookupData{
+        .lookup_name = name,
+        .lookup_mode = .Field,
+    };
+}
+
+/// Generates lookup info for a declaration given a name.
+pub fn FindDeclaration(name: []const u8) LookupData {
+    return LookupData{
+        .lookup_name = name,
+        .lookup_mode = .Declaration,
+    };
+}
+
+/// Generates lookup info for a member given a name.
+pub fn FindAny(name: []const u8) LookupData {
+    return LookupData{
+        .lookup_name = name,
+        .lookup_mode = .Any,
+    };
+}
+
 /// Used by FindInType to detail why the function call failed.
 pub const LookupError = error{
     InvalidType,

@@ -7,7 +7,10 @@
 /// Each test name is formatted as follows:
 /// "[FeatureName] [Scenario]"
 pub const RuleTests = @This();
-const LookupData = @import("common.zig").LookupData;
+const Common = @import("common.zig");
+const FindField = Common.FindField;
+const FindDeclaration = Common.FindDeclaration;
+const FindAny = Common.FindAny;
 const Rule = @import("rule.zig");
 const RuleSet = Rule.RuleSet;
 const Blank = RuleSet.Blank;
@@ -29,20 +32,38 @@ const expectError = testing.expectError;
 const activeTag = std.meta.activeTag;
 const eql = std.mem.eql;
 
-test "And" {
-    const lookup_a = LookupData{ .lookup_mode = .Field, .lookup_name = "a" };
-    const lookup_b = LookupData{ .lookup_mode = .Field, .lookup_name = "b" };
-
+test "Interfaces at last" {
     const test_type = struct {
         a: i32,
         b: i32,
     };
-    _ = test_type;
 
-    const HasAB = Blank().And(IsInType(lookup_a))
-        .And(IsInType(lookup_b));
+    // A simple interface definition
+    const HasBoth =
+        Blank()
+        .And(IsInType(FindField("a")))
+        .And(IsInType(FindField("b")));
 
-    const msg = HasAB.Print(0);
-    std.log.err("\n{s}", .{msg});
-    try expectEqual(@TypeOf(HasAB), *const RuleSet);
+    const HasEither =
+        Blank()
+        .Or(IsInType(FindField("a")))
+        .Or(IsInType(FindField("b")));
+
+    const checkBoth = try HasBoth.Check(test_type);
+    const checkEither = try HasEither.Check(test_type);
+    try expect(checkBoth);
+    try expect(checkEither);
+
+    const test_type_2 = struct {
+        a: i32,
+    };
+
+    const checkBoth2 = try HasBoth.Check(test_type_2);
+    const checkEither2 = try HasEither.Check(test_type_2);
+    try expect(!checkBoth2);
+    try expect(checkEither2);
+
+    const test_type_3 = struct {};
+
+    try expectError(Common.LookupError.TypeHasNoFields, HasBoth.Check(test_type_3));
 }

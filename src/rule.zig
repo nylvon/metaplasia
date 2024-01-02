@@ -28,6 +28,42 @@ pub const RuleSet = struct {
         // NOTE: Is it necessary?
     };
 
+    pub fn CheckChildren(comptime self: *const RuleSet, comptime target: type) anyerror!bool {
+        if (self.children) |children| {
+            var ok = true;
+            inline for (children) |*child| {
+                const child_outcome = try child.Check(target);
+                switch (child.link) {
+                    .And => {
+                        ok = ok and child_outcome;
+                    },
+                    .Or => {
+                        ok = ok or child_outcome;
+                    },
+                    .Root => {
+                        return error.ChildIsRoot;
+                    },
+                }
+            }
+            return ok;
+        } else return error.NoChildren;
+    }
+
+    pub fn Check(comptime self: *const RuleSet, comptime target: type) anyerror!bool {
+        // If there is no rule, it passes the check, otherwise evaluate.
+        const ok_rule = if (self.rule) |r| try r(target) else true;
+        const ok_children = self.CheckChildren(target) catch |err| {
+            if (err == error.NoChildren) {
+                // If there's no children, just return the rule's result.
+                return ok_rule;
+            } else return err;
+        };
+        // If we're here, ok_children is a bool.
+        // A root node is an "and" node with children.
+        // self.outcome = ok_children and ok_rule;
+        return ok_children and ok_rule;
+    }
+
     //
     //  Rule-set generation utilities
     //
@@ -127,7 +163,12 @@ pub const RuleSet = struct {
 pub fn IsInType(comptime lookup_data: Common.LookupData) RuleFn {
     return struct {
         pub fn rule(comptime target: type) anyerror!bool {
-            return Common.FindInType(target, lookup_data.lookup_name, lookup_data.lookup_mode);
+            _ = Common.FindInType(target, lookup_data.lookup_name, lookup_data.lookup_mode) catch |err| {
+                if (err == Common.LookupError.NotFound) {
+                    return false;
+                } else return err;
+            };
+            return true;
         }
     }.rule;
 }
